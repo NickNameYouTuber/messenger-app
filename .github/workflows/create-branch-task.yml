@@ -1,51 +1,11 @@
-name: GitHub Project Item Changed
+name: React to project item edit
 
 on:
-  # Для новых GitHub Projects v2
-  project_v2_item:
-    types: [edited, created, archived, deleted, reordered]
-  
-  # Для старых проектов (Classic Projects)
-  project_card:
-    types: [created, edited, moved, converted, deleted]
+  projects_v2_item:
+    types: [edited]
 
 jobs:
-  log-project-change:
+  log_event:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Determine event type
-        id: event-type
-        run: |
-          if [[ "${{ github.event_name }}" == "project_v2_item" ]]; then
-            echo "EVENT_TYPE=project_v2_item" >> $GITHUB_ENV
-            echo "ITEM_ID=${{ github.event.project_v2_item.id }}" >> $GITHUB_ENV
-            echo "PROJECT_ID=${{ github.event.project_v2_item.project_v2_id }}" >> $GITHUB_ENV
-          else
-            echo "EVENT_TYPE=project_card" >> $GITHUB_ENV
-            echo "ITEM_ID=${{ github.event.project_card.id }}" >> $GITHUB_ENV
-            echo "FROM_COLUMN=${{ github.event.changes.column_id.from }}" >> $GITHUB_ENV
-            echo "TO_COLUMN=${{ github.event.project_card.column_id }}" >> $GITHUB_ENV
-          fi
-      
-      - name: Create log directory
-        run: mkdir -p ./logs
-      
-      - name: Log project item change
-        run: |
-          echo "Event detected: ${{ env.EVENT_TYPE }}" >> ./logs/project_changes.log
-          echo "Item ID: ${{ env.ITEM_ID }}" >> ./logs/project_changes.log
-          echo "Timestamp: $(date)" >> ./logs/project_changes.log
-          echo "Action: ${{ github.event.action }}" >> ./logs/project_changes.log
-          echo "----------------------------------------" >> ./logs/project_changes.log
-      
-      - name: Commit and push logs
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add ./logs/project_changes.log
-          git commit -m "Log project item change [skip ci]" || echo "No changes to commit"
-          git push || echo "Failed to push changes"
+      - run: echo "Элемент проекта отредактирован: ${{ github.event.projects_v2_item.id }}"
