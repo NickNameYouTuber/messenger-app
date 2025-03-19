@@ -3,7 +3,7 @@ name: Move card
 on:
   # refer https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#issues
   issues:
-    types: [assigned]
+    types: [opened, edited, milestoned]
   # refer https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#issue_comment
   issue_comment:
     types: [created]
