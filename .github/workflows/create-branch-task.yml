@@ -1,41 +1,12 @@
-name: Auto Create Branch from Task
+name: Test Project Card Event
 
 on:
-  projects_v2_item:
-    types: [created, moved] # Триггер при создании или перемещении карточки
+  project_card:
+    types: [created, moved]
 
 jobs:
-  create-branch:
+  test:
     runs-on: ubuntu-latest
-    # Убедитесь, что задача в колонке "Sprint Backlog" (замените YOUR_SPRINT_BACKLOG_COLUMN_ID)
-    if: |
-      github.event.project_card.content_type == 'Issue' &&
-      github.event.project_card.column_id == 'YOUR_SPRINT_BACKLOG_COLUMN_ID'
-    
     steps:
-      - name: Extract issue info
-        id: extract
-        env:
-          ISSUE_TITLE: ${{ github.event.project_card.content.title }}
-        run: |
-          # Парсим название задачи для feature/hotfix
-          BRANCH_TYPE=$(echo "$ISSUE_TITLE" | grep -oP '(?i)(?<= )feature|hotfix(?= )' | tr '[:upper:]' '[:lower:]' || true)
-          
-          if [ -z "$BRANCH_TYPE" ]; then
-            echo "No feature/hotfix found. Skipping."
-            exit 0
-          fi
-
-          # Форматируем название ветки
-          BRANCH_NAME=$(echo "$ISSUE_TITLE" | sed -E "s/.*$BRANCH_TYPE//i" | tr ' ' '_' | tr -cd '[:alnum:]_' | tr '[:upper:]' '[:lower:]')
-          BRANCH_NAME="${BRANCH_TYPE}/_${BRANCH_NAME#_}"
-
-          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-
-      - name: Create branch
-        if: steps.extract.outputs.branch_name != ''
-        uses: peterjgrainger/action-create-branch@v2.2.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          branch: ${{ steps.extract.outputs.branch_name }}
+      - name: Dump Context
+        run: echo "${{ toJSON(github.event) }}"
