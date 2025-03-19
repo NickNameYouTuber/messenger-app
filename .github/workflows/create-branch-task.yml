@@ -1,11 +1,8 @@
-name: React to project item edit
-
 on:
   projects_v2_item:
     types: [edited]
-
 jobs:
-  log_event:
+  debug:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Элемент проекта отредактирован: ${{ github.event.projects_v2_item.id }}"
+      - run: echo "Task moved!"
