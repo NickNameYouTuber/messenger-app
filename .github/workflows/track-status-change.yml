@@ -1,14 +1,19 @@
-name: Отслеживание изменений статуса
+name: Move card
 
 on:
-  project_card:
-    types: [edited]
+  # refer https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#issues
+  issues:
+    types: [assigned]
+  # refer https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#issue_comment
+  issue_comment:
+    types: [created]
 
 jobs:
-  check_status_change:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Проверка изменения статуса
-        run: |
-          echo "Элемент проекта отредактирован: ${{ github.event.projects_v2_item.id }}"
-          echo "Изменения: ${{ toJson(github.event.changes) }}"
+      - uses: ineshbose/project-card-action@v1
+        with:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          TARGET_COLUMN: 'Review'
