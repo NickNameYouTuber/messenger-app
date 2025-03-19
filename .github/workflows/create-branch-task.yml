@@ -1,15 +1,26 @@
+name: Project Card Reaction
+
 on:
-  workflow_dispatch:
-    inputs:
-      issue-number:
-        description: 'Issue number'
-        required: true
+  project_card:
+    types: [moved]
 
 jobs:
-  create-branch:
+  log-event:
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+      projects: read
+      
     steps:
-      - name: Process Issue
+      - name: Log Event Data
         run: |
-          gh issue view ${{ inputs.issue-number }} --json title --jq '.title'
-          # Дальнейшая логика...
+          echo "🔄 Карточка перемещена!"
+          echo "Project ID: ${{ github.event.project_card.project_id }}"
+          echo "Column ID: ${{ github.event.project_card.column_id }}"
+          echo "Content URL: ${{ github.event.project_card.content_url }}"
+          
+          # Для отладки: полный JSON события
+          echo "Full event data:"
+          echo '${{ toJSON(github.event) }}' | jq .
