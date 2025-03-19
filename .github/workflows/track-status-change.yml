@@ -1,0 +1,14 @@
+name: Отслеживание изменений статуса
+
+on:
+  project_card:
+    types: [edited]
+
+jobs:
+  check_status_change:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Проверка изменения статуса
+        run: |
+          echo "Элемент проекта отредактирован: ${{ github.event.projects_v2_item.id }}"
+          echo "Изменения: ${{ toJson(github.event.changes) }}"
