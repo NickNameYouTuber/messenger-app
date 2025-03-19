@@ -1,15 +1,12 @@
+name: Test Project Card Event
+
 on:
-  workflow_dispatch:
-    inputs:
-      issue-number:
-        description: 'Issue number'
-        required: true
+  project_card:
+    types: [created, moved]
 
 jobs:
-  create-branch:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Process Issue
-        run: |
-          gh issue view ${{ inputs.issue-number }} --json title --jq '.title'
-          # Дальнейшая логика...
+      - name: Dump Context
+        run: echo "${{ toJSON(github.event) }}"
