@@ -1,58 +1,41 @@
-name: Create branch on Sprint Backlog addition
+name: Auto Create Branch from Task
 
 on:
   project_card:
-    types: [moved]
+    types: [created, moved] # Триггер при создании или перемещении карточки
 
 jobs:
   create-branch:
     runs-on: ubuntu-latest
+    # Убедитесь, что задача в колонке "Sprint Backlog" (замените YOUR_SPRINT_BACKLOG_COLUMN_ID)
+    if: |
+      github.event.project_card.content_type == 'Issue' &&
+      github.event.project_card.column_id == 'YOUR_SPRINT_BACKLOG_COLUMN_ID'
+    
     steps:
-      - name: Get column details
-        id: get_column
+      - name: Extract issue info
+        id: extract
+        env:
+          ISSUE_TITLE: ${{ github.event.project_card.content.title }}
         run: |
-          # Получаем URL колонки из события
-          column_url="${{ github.event.project_card.column_url }}"
-          echo "Column URL: $column_url"
-          # Получаем данные колонки через API GitHub
-          column_json=$(curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -s $column_url)
-          # Извлекаем имя колонки (нужен jq, он предустановлен на ubuntu-latest)
-          column_name=$(echo $column_json | jq -r '.name')
-          echo "Column name: $column_name"
-          # Если колонка не «Sprint Backlog», прекращаем выполнение
-          if [ "$column_name" != "Sprint Backlog" ]; then
-            echo "Not Sprint Backlog column. Exiting."
-            exit 0
-          fi
-          echo "::set-output name=column_name::$column_name"
-
-      - name: Parse task title and compute branch name
-        id: get_branch
-        run: |
-          card_note="${{ github.event.project_card.note }}"
-          echo "Card note: $card_note"
-          # Проверяем, что задача начинается с [что-то] feature или hotfix, затем название
-          if [[ "$card_note" =~ ^\[.*\]\ (feature|hotfix)\ (.*) ]]; then
-            type="${BASH_REMATCH[1]}"
-            name="${BASH_REMATCH[2]}"
-            # Преобразуем название: переводим в нижний регистр и заменяем пробелы на _
-            branch_name=$(echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/ /_/g')
-            final_branch="${type}/_${branch_name}"
-            echo "Branch name: $final_branch"
-            echo "::set-output name=branch::$final_branch"
-          else
-            echo "Task does not match criteria. Exiting."
+          # Парсим название задачи для feature/hotfix
+          BRANCH_TYPE=$(echo "$ISSUE_TITLE" | grep -oP '(?i)(?<= )feature|hotfix(?= )' | tr '[:upper:]' '[:lower:]' || true)
+          
+          if [ -z "$BRANCH_TYPE" ]; then
+            echo "No feature/hotfix found. Skipping."
             exit 0
           fi
 
-      - name: Checkout main branch
-        uses: actions/checkout@v2
+          # Форматируем название ветки
+          BRANCH_NAME=$(echo "$ISSUE_TITLE" | sed -E "s/.*$BRANCH_TYPE//i" | tr ' ' '_' | tr -cd '[:alnum:]_' | tr '[:upper:]' '[:lower:]')
+          BRANCH_NAME="${BRANCH_TYPE}/_${BRANCH_NAME#_}"
+
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create branch
+        if: steps.extract.outputs.branch_name != ''
+        uses: peterjgrainger/action-create-branch@v2.2.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          ref: main
-
-      - name: Create and push branch
-        run: |
-          branch=${{ steps.get_branch.outputs.branch }}
-          echo "Creating branch: $branch"
-          git checkout -b "$branch"
-          git push origin "$branch"
+          branch: ${{ steps.extract.outputs.branch_name }}
