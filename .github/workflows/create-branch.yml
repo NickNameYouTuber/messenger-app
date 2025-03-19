@@ -1,41 +1,56 @@
 name: Auto Create Branch from Task
 
 on:
-  projects_v2_item:
-    types: [created, moved] # Триггер при создании или перемещении карточки
+  project_card:
+    types: [created, moved]
 
 jobs:
   create-branch:
     runs-on: ubuntu-latest
-    # Убедитесь, что задача в колонке "Sprint Backlog" (замените YOUR_SPRINT_BACKLOG_COLUMN_ID)
     if: |
-      github.event.project_card.content_type == 'Issue' &&
-      github.event.project_card.column_id == 'YOUR_SPRINT_BACKLOG_COLUMN_ID'
-    
+      github.event.project_card.column_id == 'YOUR_SPRINT_BACKLOG_COLUMN_ID' &&
+      contains(github.event.project_card.content_url, '/issues/')
+
     steps:
-      - name: Extract issue info
-        id: extract
+      - name: Get Issue Data
+        id: get_issue
         env:
-          ISSUE_TITLE: ${{ github.event.project_card.content.title }}
+          ISSUE_URL: ${{ github.event.project_card.content_url }}
         run: |
-          # Парсим название задачи для feature/hotfix
-          BRANCH_TYPE=$(echo "$ISSUE_TITLE" | grep -oP '(?i)(?<= )feature|hotfix(?= )' | tr '[:upper:]' '[:lower:]' || true)
+          issue_id=${ISSUE_URL##*/}
+          response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${issue_id}")
           
-          if [ -z "$BRANCH_TYPE" ]; then
-            echo "No feature/hotfix found. Skipping."
+          title=$(echo "$response" | jq -r '.title')
+          echo "title=$title" >> $GITHUB_OUTPUT
+
+      - name: Process Branch Name
+        id: process_name
+        run: |
+          title="${{ steps.get_issue.outputs.title }}"
+          
+          # Извлекаем feature/hotfix
+          branch_type=$(echo "$title" | grep -ioP '(?<=\s)(feature|hotfix)(?=\s)' | tr '[:upper:]' '[:lower:]' || true)
+          
+          if [ -z "$branch_type" ]; then
+            echo "Skipping: no feature/hotfix found"
             exit 0
           fi
 
-          # Форматируем название ветки
-          BRANCH_NAME=$(echo "$ISSUE_TITLE" | sed -E "s/.*$BRANCH_TYPE//i" | tr ' ' '_' | tr -cd '[:alnum:]_' | tr '[:upper:]' '[:lower:]')
-          BRANCH_NAME="${BRANCH_TYPE}/_${BRANCH_NAME#_}"
+          # Форматируем название
+          clean_title=$(echo "$title" | sed -E "s/.*$branch_type//i")
+          branch_name=$(echo "$clean_title" | \
+            tr '[:upper:]' '[:lower:]' | \
+            tr ' ' '_' | \
+            tr -cd '[:alnum:]_' | \
+            sed 's/_\+/_/g')
+          
+          echo "branch_name=${branch_type}/_${branch_name#_}" >> $GITHUB_OUTPUT
 
-          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-
-      - name: Create branch
-        if: steps.extract.outputs.branch_name != ''
+      - name: Create Branch
+        if: steps.process_name.outputs.branch_name != ''
         uses: peterjgrainger/action-create-branch@v2.2.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          branch: ${{ steps.extract.outputs.branch_name }}
+          branch: ${{ steps.process_name.outputs.branch_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
