@@ -1,47 +1,51 @@
-name: Project Card Moved Action
+name: GitHub Project Item Changed
 
 on:
+  # Для новых GitHub Projects v2
+  project_v2_item:
+    types: [edited, created, archived, deleted, reordered]
+  
+  # Для старых проектов (Classic Projects)
   project_card:
-    types: [moved]
+    types: [created, edited, moved, converted, deleted]
 
 jobs:
-  track-card-movement:
+  log-project-change:
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
-      - name: Get card details
-        id: card-details
+      - name: Determine event type
+        id: event-type
         run: |
-          echo "::set-output name=card_id::${{ github.event.project_card.id }}"
-          echo "::set-output name=column_id::${{ github.event.project_card.column_id }}"
-          echo "::set-output name=project_url::${{ github.event.project_card.project_url }}"
-          echo "::set-output name=card_url::${{ github.event.project_card.url }}"
+          if [[ "${{ github.event_name }}" == "project_v2_item" ]]; then
+            echo "EVENT_TYPE=project_v2_item" >> $GITHUB_ENV
+            echo "ITEM_ID=${{ github.event.project_v2_item.id }}" >> $GITHUB_ENV
+            echo "PROJECT_ID=${{ github.event.project_v2_item.project_v2_id }}" >> $GITHUB_ENV
+          else
+            echo "EVENT_TYPE=project_card" >> $GITHUB_ENV
+            echo "ITEM_ID=${{ github.event.project_card.id }}" >> $GITHUB_ENV
+            echo "FROM_COLUMN=${{ github.event.changes.column_id.from }}" >> $GITHUB_ENV
+            echo "TO_COLUMN=${{ github.event.project_card.column_id }}" >> $GITHUB_ENV
+          fi
       
-      - name: Get column name
-        id: column-name
-        run: |
-          COLUMN_NAME=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.inertia-preview+json" \
-            "${{ github.event.project_card.column_url }}" | jq -r .name)
-          echo "::set-output name=name::$COLUMN_NAME"
+      - name: Create log directory
+        run: mkdir -p ./logs
       
-      - name: Log card movement
+      - name: Log project item change
         run: |
-          echo "Карточка с ID ${{ steps.card-details.outputs.card_id }} была перемещена"
-          echo "Перемещена в колонку: ${{ steps.column-name.outputs.name }}"
-          echo "URL колонки: ${{ github.event.project_card.column_url }}"
-          
-          # Создаем временный файл для логирования (для демонстрации)
-          mkdir -p ./logs
-          echo "Card ${{ steps.card-details.outputs.card_id }} moved to column ${{ steps.column-name.outputs.name }} at $(date)" >> ./logs/card_movements.log
-          
-      - name: Commit and push log (for demonstration)
+          echo "Event detected: ${{ env.EVENT_TYPE }}" >> ./logs/project_changes.log
+          echo "Item ID: ${{ env.ITEM_ID }}" >> ./logs/project_changes.log
+          echo "Timestamp: $(date)" >> ./logs/project_changes.log
+          echo "Action: ${{ github.event.action }}" >> ./logs/project_changes.log
+          echo "----------------------------------------" >> ./logs/project_changes.log
+      
+      - name: Commit and push logs
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add ./logs/card_movements.log
-          git commit -m "Log card movement: ID ${{ steps.card-details.outputs.card_id }} to column ${{ steps.column-name.outputs.name }}" || echo "No changes to commit"
-          git push
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add ./logs/project_changes.log
+          git commit -m "Log project item change [skip ci]" || echo "No changes to commit"
+          git push || echo "Failed to push changes"
