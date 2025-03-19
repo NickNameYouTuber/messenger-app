@@ -1,7 +1,7 @@
 name: Auto Create Branch from Task
 
 on:
-  project_card:
+  projects_v2_item:
     types: [created, moved] # Триггер при создании или перемещении карточки
 
 jobs:
