@@ -1,16 +1,12 @@
-// app.test.js
-
 // Мокаем fetch API
 global.fetch = jest.fn();
 
-// Импортируем функции из нашего приложения
-// Обычно вы бы использовали здесь реальные импорты, но для примера предположим, что функции доступны глобально
 const {
   fetchCityTime,
   fetchCityImage,
   addToSearchHistory,
   searchHistory
-} = require('./app.js'); // Путь к вашему файлу с JavaScript кодом
+} = require('./app.js');
 
 // Мокаем localStorage
 const localStorageMock = (() => {
