@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Время городов мира</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2980b9;
+            --bg-color: #f5f7fa;
+            --text-color: #333;
+            --card-bg: #fff;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .search-container {
+            display: flex;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #city-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: none;
+            font-size: 16px;
+            outline: none;
+        }
+
+        #search-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        #search-btn:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .result-card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .city-info {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        @media (min-width: 600px) {
+            .city-info {
+                flex-direction: row;
+            }
+        }
+
+        .time-info {
+            flex: 1;
+        }
+
+        .city-name {
+            font-size: 24px;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .city-time {
+            font-size: 36px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .image-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .city-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 5px;
+        }
+
+        .no-image {
+            color: #888;
+            font-style: italic;
+        }
+
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            margin-top: 10px;
+            text-align: center;
+            display: none;
+        }
+
+        .history {
+            margin-top: 30px;
+        }
+
+        .history h2 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .history-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .history-item {
+            background-color: var(--card-bg);
+            margin-bottom: 10px;
+            padding: 12px 15px;
+            border-radius: 5px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .history-item:hover {
+            background-color: #f1f5f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Время городов мира</h1>
+            <p>Введите название города, чтобы узнать текущее время и увидеть фотографию</p>
+        </header>
+
+        <div class="search-container">
+            <input type="text" id="city-input" placeholder="Введите название города..." aria-label="Название города">
+            <button id="search-btn">Поиск</button>
+        </div>
+
+        <div id="loading" class="loading">Загрузка данных...</div>
+        <div id="error-message" class="error-message"></div>
+
+        <div id="result-card" class="result-card">
+            <div class="city-info">
+                <div class="time-info">
+                    <h2 id="city-name" class="city-name"></h2>
+                    <div id="city-time" class="city-time"></div>
+                    <div id="updated-time">Обновлено: <span id="update-timestamp"></span></div>
+                </div>
+                <div class="image-container">
+                    <img id="city-image" class="city-image" alt="" style="display: none;">
+                    <p id="no-image" class="no-image" style="display: none;">Фотография города не найдена</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="history">
+            <h2>История поиска</h2>
+            <ul id="history-list" class="history-list"></ul>
+        </div>
+    </div>
+
+    <script>
+        // Основные элементы страницы
+        const cityInput = document.getElementById('city-input');
+        const searchBtn = document.getElementById('search-btn');
+        const resultCard = document.getElementById('result-card');
+        const cityName = document.getElementById('city-name');
+        const cityTime = document.getElementById('city-time');
+        const updateTimestamp = document.getElementById('update-timestamp');
+        const cityImage = document.getElementById('city-image');
+        const noImage = document.getElementById('no-image');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('error-message');
+        const historyList = document.getElementById('history-list');
+
+        // Базовый URL для API
+        const API_BASE_URL = '/api/v1';
+
+        // История поиска
+        let searchHistory = JSON.parse(localStorage.getItem('citySearchHistory')) || [];
+
+        // Инициализация страницы
+        function init() {
+            renderSearchHistory();
+            setupEventListeners();
+        }
+
+        // Настройка обработчиков событий
+        function setupEventListeners() {
+            searchBtn.addEventListener('click', searchCity);
+            cityInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchCity();
+                }
+            });
+        }
+
+        // Поиск информации о городе
+        async function searchCity() {
+            const city = cityInput.value.trim();
+            
+            if (!city) {
+                showError('Пожалуйста, введите название города');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+            hideResults();
+
+            try {
+                const [timeData, imageData] = await Promise.all([
+                    fetchCityTime(city),
+                    fetchCityImage(city)
+                ]);
+
+                if (timeData) {
+                    displayResults(city, timeData, imageData);
+                    addToSearchHistory(city);
+                } else {
+                    showError('Не удалось получить информацию о городе');
+                }
+            } catch (error) {
+                console.error('Error fetching city data:', error);
+                showError('Произошла ошибка при получении данных');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Получение времени города с сервера
+        async function fetchCityTime(city) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/get_time?city=${encodeURIComponent(city)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                return data.time;
+            } catch (error) {
+                console.error('Error fetching time:', error);
+                return null;
+            }
+        }
+
+        // Получение изображения города с сервера
+        async function fetchCityImage(city) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/get_image?city=${encodeURIComponent(city)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                return data.cityImageUrl;
+            } catch (error) {
+                console.error('Error fetching image:', error);
+                return null;
+            }
+        }
+
+        // Отображение результатов поиска
+        function displayResults(city, time, imageUrl) {
+            cityName.textContent = city;
+            cityTime.textContent = time;
+            updateTimestamp.textContent = new Date().toLocaleTimeString();
+            
+            if (imageUrl) {
+                cityImage.src = imageUrl;
+                cityImage.alt = `Фото города ${city}`;
+                cityImage.style.display = 'block';
+                noImage.style.display = 'none';
+            } else {
+                cityImage.style.display = 'none';
+                noImage.style.display = 'block';
+            }
+            
+            resultCard.style.display = 'block';
+        }
+
+        // Добавление города в историю поиска
+        function addToSearchHistory(city) {
+            // Удаляем город из истории, если он уже есть
+            searchHistory = searchHistory.filter(item => item.toLowerCase() !== city.toLowerCase());
+            
+            // Добавляем город в начало массива
+            searchHistory.unshift(city);
+            
+            // Ограничиваем историю до 10 элементов
+            if (searchHistory.length > 10) {
+                searchHistory.pop();
+            }
+            
+            // Сохраняем историю в localStorage
+            localStorage.setItem('citySearchHistory', JSON.stringify(searchHistory));
+            
+            // Обновляем отображение истории
+            renderSearchHistory();
+        }
+
+        // Отображение истории поиска
+        function renderSearchHistory() {
+            historyList.innerHTML = '';
+            
+            searchHistory.forEach(city => {
+                const li = document.createElement('li');
+                li.className = 'history-item';
+                li.textContent = city;
+                li.addEventListener('click', () => {
+                    cityInput.value = city;
+                    searchCity();
+                });
+                historyList.appendChild(li);
+            });
+        }
+
+        // Показать/скрыть индикатор загрузки
+        function showLoading(show) {
+            loading.style.display = show ? 'block' : 'none';
+        }
+
+        // Отображение сообщения об ошибке
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        // Скрытие сообщения об ошибке
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        // Скрытие результатов
+        function hideResults() {
+            resultCard.style.display = 'none';
+        }
+
+        // Инициализация страницы при загрузке
+        document.addEventListener('DOMContentLoaded', init);
+
+        // Экспорт функций для тестирования
+        if (typeof module !== 'undefined' && module.exports) {
+            module.exports = {
+                fetchCityTime,
+                fetchCityImage,
+                addToSearchHistory,
+                searchHistory
+            };
+        }
+    </script>
+</body>
+</html>
