@@ -116,7 +116,7 @@ jobs:
             The test results are as follows:
             $MESSAGE  # Переменная с результатами тестов
           secure: true  # Использовать TLS для защищенного соединения
-          nodemailerlog: true  # Включить логирование для отладки
+          # Удаляем параметр nodemailerlog, чтобы избежать ошибок
 
     outputs:
       test_status: ${{ env.STATUS }}
