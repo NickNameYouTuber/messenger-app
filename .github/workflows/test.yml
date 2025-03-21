@@ -1,0 +1,18 @@
+name: Test and Notify
+
+on:
+  push:
+    branches:
+      - 'feature/*'
+      - 'hotfix/*'
+
+jobs:
+  test-and-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Print branch name
+        run: echo "Пуш в ветку: ${{ github.ref_name }}"
