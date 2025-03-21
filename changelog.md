@@ -14,3 +14,10 @@
 ### Added
 - Added a simple API
 - Added a simple frontend
+
+## [0.2.0] - 2025-03-21
+### Added
+- simple tests
+- docker file
+### Change
+- readme

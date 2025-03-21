@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from app import app
+from backend.app import app
 
 client = TestClient(app)
 
@@ -27,7 +27,7 @@ def test_get_time_no_time_data():
     """
     Тест, когда данные о времени отсутствуют (если бы такой случай был).
     """
-    from app import cities_data
+    from backend.app import cities_data
     cities_data["TestCity"] = {"time": None, "image_url": None}
 
     response = client.get("/get_time", params={"city": "TestCity"})
