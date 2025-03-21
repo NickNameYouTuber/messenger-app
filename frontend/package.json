@@ -16,7 +16,7 @@
   "jest": {
     "testEnvironment": "jsdom",
     "testMatch": [
-      "C:\\Users\\Nick\\Documents\\NIProjects\\messenger-app\\frontend\\world-time-city.test.js"
+      "**/world-time-city.test.js"
     ]
   }
 }
