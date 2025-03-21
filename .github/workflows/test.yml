@@ -110,7 +110,7 @@ jobs:
           smtp-user: ${{ secrets.SMTP_USER }}
           smtp-password: ${{ secrets.SMTP_PASSWORD }}
           from: ${{ secrets.SMTP_USER }}
-          to: recipient@example.com
+          to: 123ababab123ababab@gmail.com
           subject: Test Results - ${{ github.ref_name }}
           body: |
             The test results are as follows:
