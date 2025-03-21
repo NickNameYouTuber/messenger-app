@@ -1,0 +1,13 @@
+sonar:
+  organization: NI Corp.
+  projectKey: messenger-app
+  projectName: NickNameYouTuber_messenger-app
+
+  sources:
+    - frontend/src
+    - backend/src
+
+  exclusions:
+    - "**/node_modules/**"
+    - "**/tests/**"
+    - "**/venv/**"

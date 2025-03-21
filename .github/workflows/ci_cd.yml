@@ -120,6 +120,11 @@ jobs:
     outputs:
       test_status: ${{ env.STATUS }}
 
+  # Вызов Reusable Workflow для анализа через SonarCloud
+  sonar-analysis:
+    uses: ./.github/workflows/sonar-analysis.yml
+    needs: test-and-notify  # Зависит от задачи test-and-notify
+
   # Завершающая проверка, которая завершает workflow с ошибкой, если тесты не прошли
   status:
     needs: test-and-notify
