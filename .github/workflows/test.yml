@@ -74,8 +74,8 @@ jobs:
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
-            -d text="${{ env.MESSAGE }}" \
-            -d parse_mode="Markdown"
+            -d text="✅ Tests passed successfully!<br>Branch: feature/test_actions<br>Commit: 593ac84a2c3f2e4f9a9a7eab014977e8c3f9f974" \
+            -d parse_mode="HTML"
 
     outputs:
       test_status: ${{ env.STATUS }}
