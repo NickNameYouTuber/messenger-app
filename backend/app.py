@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-app = FastAPI()
+app = FastAPI(openapi_prefix="/api/v1")
 
-# Пример данных: город -> время и URL изображения
+
+
 cities_data = {
     "Moscow": {"time": "12:00", "image_url": "https://gsenzao.ru/wp-content/uploads/2023/09/5b506d941900002800c66d47-scaled.jpeg"},
     "New York": {"time": "05:00", "image_url": "https://images.genius.com/cd861f85983f08d819c04215aff10325.1000x667x1.jpg"},
@@ -44,4 +45,12 @@ async def get_image(city: str):
     if image_url is None:
         return {"cityImageUrl": None}
 
+
     return {"cityImageUrl": image_url}
+
+@app.get("/{number}")
+async def secret(number: int):
+    if number == 1488:
+        return {"answer": "Коммиты делать мы не просим"}
+
+    return {"answer": "Неизвестное число"}
