@@ -1,0 +1,138 @@
+name: Test and Notify
+
+on:
+  push:
+    branches:
+      - 'feature/*'
+      - 'hotfix/*'
+
+jobs:
+  test-and-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Настройка и тестирование фронтенда
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: ./frontend
+
+      # Запускаем Jest с выводом отчёта в JSON
+      - name: Run Jest tests
+        id: frontend-tests
+        run: npx jest --json --outputFile=jest-results.json --verbose
+        working-directory: ./frontend
+        continue-on-error: true
+
+      # Отправляем отдельное уведомление в Telegram для каждого теста
+      - name: Send individual Telegram notifications for frontend tests
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -f jest-results.json ]; then
+            cat jest-results.json | jq -c '.testResults[].assertionResults[]' | while read -r test; do
+              TEST_NAME=$(echo "$test" | jq -r '.fullName')
+              TEST_STATUS=$(echo "$test" | jq -r '.status')
+              MESSAGE="Test: $TEST_NAME\nStatus: $TEST_STATUS"
+              curl -s -X POST \
+                https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+                -d chat_id=${TELEGRAM_CHAT_ID} \
+                -d text="$(echo -e "$MESSAGE")" \
+                -d parse_mode="HTML"
+            done
+          else
+            echo "jest-results.json not found."
+          fi
+        working-directory: ./frontend
+        shell: bash
+
+      # Настройка и тестирование бэкенда
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest fastapi httpx
+        working-directory: ./backend
+
+      - name: Run backend tests
+        id: backend-tests
+        run: pytest -v
+        working-directory: ./backend
+        continue-on-error: true
+
+      # Определяем общий статус тестирования и формируем итоговое сообщение
+      - name: Determine test status
+        id: test-status
+        run: |
+          FRONTEND_STATUS="${{ steps.frontend-tests.outcome }}"
+          BACKEND_STATUS="${{ steps.backend-tests.outcome }}"
+          
+          if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
+            echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}" >> $GITHUB_ENV
+            echo "STATUS=success" >> $GITHUB_ENV
+          else
+            echo "MESSAGE=❌ Some tests failed!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AFrontend: $FRONTEND_STATUS%0ABackend: $BACKEND_STATUS" >> $GITHUB_ENV
+            echo "STATUS=failure" >> $GITHUB_ENV
+          fi
+        shell: bash
+
+      # Отправляем итоговое уведомление в Telegram
+      - name: Send Telegram final notification
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
+        shell: bash
+
+      # Отправляем итоговое уведомление по электронной почте
+      - name: Send email with test results
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: 465
+          username: ${{ secrets.SMTP_USER }}  # Ваш email, например, 123ababab123ababab@gmail.com
+          password: ${{ secrets.SMTP_PASSWORD }}  # Ваш пароль, например, 85B4672943B05596B50650A86554840FBFDE
+          from: ${{ secrets.SMTP_USER }}  # Тот же email, что и username
+          to: ${{ secrets.EMAIL_RECIPIENT }}  # Адрес получателя
+          subject: Test Results - ${{ github.ref_name }}
+          body: |
+            The test results are as follows:
+            ${{ env.MESSAGE }}  # Переменная с результатами тестов
+          secure: true  # Отключаем прямое SSL, используем STARTTLS
+
+    outputs:
+      test_status: ${{ env.STATUS }}
+      
+  # Вызов Reusable Workflow для анализа через SonarCloud
+  sonar-analysis:
+    uses: ./.github/workflows/sonar-analysis.yml
+    needs: test-and-notify  # Зависит от задачи test-and-notify
+
+  # Завершающая проверка, которая завершает workflow с ошибкой, если тесты не прошли
+  status:
+    needs: test-and-notify
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test-and-notify.outputs.test_status }}" != "success" ]; then
+            exit 1
+          fi
