@@ -1,0 +1,20 @@
+sonar:
+  organization: NI Corp.
+  projectKey: messenger-app
+  projectName: NickNameYouTuber_messenger-app
+
+  # Указываем исходные файлы для JS и Python
+  sources:
+    - frontend/src
+    - backend/src
+
+  # Явное указание языков
+  language: 
+    - js
+    - py
+
+  # Исключения (если нужно)
+  exclusions:
+    - "**/node_modules/**"
+    - "**/tests/**"
+    - "**/venv/**"
