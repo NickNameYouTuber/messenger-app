@@ -59,10 +59,10 @@ Attol — это опенсорсная платформа, предназнач
 - Kubernetes: Развертывание в production.
 - Nginx: Настройка HTTPS
 **Фронтенд**
-- HTML, CSS, JavaScript.
+- React, HTML, CSS, JavaScript.
 - Jest: тестирование JavaScript
 **Бэкенд**
-- Flask (Python): API платформы.
+- FastAPI (Python): API платформы.
 - SQLAlchemy: Работа с базой данных SQLite.
 ---
 
