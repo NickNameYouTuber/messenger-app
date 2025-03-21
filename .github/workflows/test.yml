@@ -57,12 +57,14 @@ jobs:
           FRONTEND_STATUS="${{ steps.frontend-tests.outcome }}"
           BACKEND_STATUS="${{ steps.backend-tests.outcome }}"
           
-          if [ "$FRONTEND_STATUS" = "success" ] && [ "$BACKEND_STATUS" = "success" ]; then
-            echo "MESSAGE=✅ Tests passed successfully!\nBranch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}" >> $GITHUB_ENV
+          if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
+            echo "MESSAGE=✅ Tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}" >> $GITHUB_ENV
             echo "STATUS=success" >> $GITHUB_ENV
           else
-            echo "MESSAGE=❌ Tests failed!\nBranch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}\nFrontend: $FRONTEND_STATUS\nBackend: $BACKEND_STATUS" >> $GITHUB_ENV
+            echo "MESSAGE=❌ Tests failed!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AFrontend: $FRONTEND_STATUS%0ABackend: $BACKEND_STATUS" >> $GITHUB_ENV
             echo "STATUS=failure" >> $GITHUB_ENV
+          fi
+        shell: bash
 
       # Отправляем уведомление в Telegram
       - name: Send Telegram notification
