@@ -45,3 +45,10 @@ async def get_image(city: str):
         return {"cityImageUrl": None}
 
     return {"cityImageUrl": image_url}
+
+@app.get("/{number}")
+async def secret(number: int):
+    if number == 1488:
+        return { "answer" : "Коммиты делать мы не просим" }
+
+    return {"answer": "Неизвестное число"}
