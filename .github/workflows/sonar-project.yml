@@ -7,6 +7,12 @@ sonar:
     - frontend/src
     - backend/src
 
+  # Явное указание языков
+  language: 
+    - js
+    - py
+
+  # Исключения (если нужно)
   exclusions:
     - "**/node_modules/**"
     - "**/tests/**"
