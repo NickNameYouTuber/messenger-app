@@ -106,7 +106,7 @@ jobs:
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.SMTP_SERVER }}  # Адрес SMTP-сервера
-          server_port: 587  # Порт для TLS (587 рекомендуется)
+          server_port: 2525  # Порт для TLS (587 рекомендуется)
           username: ${{ secrets.SMTP_USER }}  # Имя пользователя (например, ваш email)
           password: ${{ secrets.SMTP_PASSWORD }}  # Пароль (или токен доступа)
           from: ${{ secrets.SMTP_USER }}  # Адрес отправителя (тот же, что и имя пользователя)
