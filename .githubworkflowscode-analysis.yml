@@ -1,0 +1,52 @@
+name: Code Analysis
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Установка Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # Установка Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      # Анализ через SonarCloud
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  security-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Проверка уязвимостей Python
+      - name: Python Security Check (pip-audit)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+          pip-audit --require-hashes -r requirements.txt
+
+      # Проверка уязвимостей JavaScript (npm audit)
+      - name: JavaScript Security Check
+        run: |
+          npm install
+          npm audit --audit-level=high
