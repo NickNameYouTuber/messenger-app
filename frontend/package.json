@@ -1,12 +1,22 @@
 {
   "name": "frontend",
   "version": "1.0.0",
-  "main": "world-time-city.test.js",
+  "main": "world-time-city-tests.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --verbose"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "C:\\Users\\Nick\\Documents\\NIProjects\\messenger-app\\frontend\\world-time-city.test.js"
+    ]
+  }
 }
