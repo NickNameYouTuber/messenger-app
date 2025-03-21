@@ -105,17 +105,18 @@ jobs:
       - name: Send email with test results
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: ${{ secrets.SMTP_SERVER }}  # Use server_address instead of smtp-server
-          server_port: 587
-          username: ${{ secrets.SMTP_USER }}  # Use username for the SMTP user
-          password: ${{ secrets.SMTP_PASSWORD }}  # Use password for the SMTP password
-          from: ${{ secrets.SMTP_USER }}
-          to: ${{ secrets.EMAIL_RECIPIENT }}  # Set the recipient email address
-          subject: Test Results - feature/test_actions
+          server_address: ${{ secrets.SMTP_SERVER }}  # Адрес SMTP-сервера
+          server_port: 587  # Порт для TLS (587 рекомендуется)
+          username: ${{ secrets.SMTP_USER }}  # Имя пользователя (например, ваш email)
+          password: ${{ secrets.SMTP_PASSWORD }}  # Пароль (или токен доступа)
+          from: ${{ secrets.SMTP_USER }}  # Адрес отправителя (тот же, что и имя пользователя)
+          to: ${{ secrets.EMAIL_RECIPIENT }}  # Адрес получателя
+          subject: Test Results - feature/test_actions  # Тема письма
           body: |
             The test results are as follows:
-            $MESSAGE
-          secure: true  # Enable secure connection (SSL/TLS)
+            $MESSAGE  # Переменная с результатами тестов
+          secure: true  # Использовать TLS для защищенного соединения
+          nodemailerlog: true  # Включить логирование для отладки
 
     outputs:
       test_status: ${{ env.STATUS }}
