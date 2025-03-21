@@ -26,8 +26,7 @@ jobs:
 
       - name: Run Jest tests
         id: frontend-tests
-        run: |
-          npx jest ./world-time-city-tests.js --verbose
+        run: npx jest --verbose
         working-directory: ./frontend
         continue-on-error: true
 

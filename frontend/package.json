@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "version": "1.0.0",
-  "main": "world-time-city-tests.js",
+  "main": "app.js",
   "scripts": {
     "test": "jest --verbose"
   },
