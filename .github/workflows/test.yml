@@ -101,6 +101,26 @@ jobs:
             -d parse_mode="HTML"
         shell: bash
 
+      # Отправляем итоговое уведомление по электронной почте
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          smtp-server: ${{ secrets.SMTP_SERVER }}
+          smtp-port: 587
+          smtp-user: ${{ secrets.SMTP_USER }}
+          smtp-password: ${{ secrets.SMTP_PASSWORD }}
+          from: ${{ secrets.SMTP_USER }}
+          to: recipient@example.com
+          subject: Test Results - ${{ github.ref_name }}
+          body: |
+            The test results are as follows:
+            $MESSAGE
+        env:
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+
     outputs:
       test_status: ${{ env.STATUS }}
 
