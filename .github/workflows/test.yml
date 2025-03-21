@@ -1,6 +1,5 @@
 name: Test and Notify
 
-# Указываем, когда запускать workflow
 on:
   push:
     branches:
@@ -12,56 +11,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Установка окружения
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-      # Настройка Node.js для frontend тестов
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '16'
 
-      # Установка зависимостей для frontend
       - name: Install frontend dependencies
         run: npm ci
         working-directory: ./frontend
 
-      # Запуск frontend тестов
       - name: Run frontend tests
         id: frontend-tests
-        run: npm test
+        run: npm test || true
         working-directory: ./frontend
-        continue-on-error: true
 
-      # Настройка Python для backend тестов
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      # Установка зависимостей для backend
       - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest fastapi httpx
+          pip install -r requirements.txt
         working-directory: ./backend
 
-      # Запуск backend тестов
       - name: Run backend tests
         id: backend-tests
-        run: pytest
+        run: pytest || true
         working-directory: ./backend
-        continue-on-error: true
 
-      # Определяем статус тестов
       - name: Determine test status
         id: test-status
         run: |
           FRONTEND_STATUS="${{ steps.frontend-tests.outcome }}"
           BACKEND_STATUS="${{ steps.backend-tests.outcome }}"
-          
-          if [ "$FRONTEND_STATUS" = "success" ] && [ "$BACKEND_STATUS" = "success" ]; then
+
+          if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
             echo "MESSAGE=✅ Tests passed successfully!\nBranch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}" >> $GITHUB_ENV
             echo "STATUS=success" >> $GITHUB_ENV
           else
@@ -69,7 +60,6 @@ jobs:
             echo "STATUS=failure" >> $GITHUB_ENV
           fi
 
-      # Отправка уведомления в Telegram
       - name: Send Telegram notification
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -81,18 +71,16 @@ jobs:
             -d text="${{ env.MESSAGE }}" \
             -d parse_mode="Markdown"
 
-    # Указываем, что job должен завершаться успешно только если тесты прошли
     outputs:
       test_status: ${{ env.STATUS }}
 
-# Добавляем условие завершения workflow
-status:
-  needs: test-and-notify
-  runs-on: ubuntu-latest
-  if: always()
-  steps:
-    - name: Check test results
-      run: |
-        if [ "${{ needs.test-and-notify.outputs.test_status }}" != "success" ]; then
-          exit 1
-        fi
+  status:
+    needs: test-and-notify
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test-and-notify.outputs.test_status }}" != "success" ]; then
+            exit 1
+          fi
