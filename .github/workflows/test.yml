@@ -105,18 +105,17 @@ jobs:
       - name: Send email with test results
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: ${{ secrets.SMTP_SERVER }}  # Адрес SMTP-сервера
-          server_port: 2525  # Порт для TLS (587 рекомендуется)
-          username: ${{ secrets.SMTP_USER }}  # Имя пользователя (например, ваш email)
-          password: ${{ secrets.SMTP_PASSWORD }}  # Пароль (или токен доступа)
-          from: ${{ secrets.SMTP_USER }}  # Адрес отправителя (тот же, что и имя пользователя)
+          server_address: smtp.elasticemail.com
+          server_port: 2525
+          username: ${{ secrets.SMTP_USER }}  # Ваш email, например, 123ababab123ababab@gmail.com
+          password: ${{ secrets.SMTP_PASSWORD }}  # Ваш пароль, например, 85B4672943B05596B50650A86554840FBFDE
+          from: ${{ secrets.SMTP_USER }}  # Тот же email, что и username
           to: ${{ secrets.EMAIL_RECIPIENT }}  # Адрес получателя
-          subject: Test Results - feature/test_actions  # Тема письма
+          subject: Test Results - ${{ github.ref_name }}
           body: |
             The test results are as follows:
-            $MESSAGE  # Переменная с результатами тестов
-          secure: true  # Использовать TLS для защищенного соединения
-          # Удаляем параметр nodemailerlog, чтобы избежать ошибок
+            ${{ env.MESSAGE }}  # Переменная с результатами тестов
+          secure: false  # Отключаем прямое SSL, используем STARTTLS
 
     outputs:
       test_status: ${{ env.STATUS }}
