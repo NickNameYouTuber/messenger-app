@@ -30,6 +30,7 @@ jobs:
         working-directory: ./frontend
         continue-on-error: true
 
+      # Label | test-passed
       - name: Add label "test-passed"
         uses: actions/github-script@v6
         with:
