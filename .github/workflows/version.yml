@@ -26,7 +26,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-
       # Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -82,6 +81,14 @@ jobs:
           echo "- ${{ steps.commit.outputs.message }}" >> $CHANGELOG_FILE
           echo "" >> $CHANGELOG_FILE
 
+      # Проверка наличия PAT_TOKEN
+      - name: Check PAT_TOKEN existence
+        run: |
+          if [ -z "${{ secrets.PAT_TOKEN }}" ]; then
+            echo "Error: PAT_TOKEN is not set"
+            exit 1
+          fi
+
       # Commit changes
       - name: Commit version and changelog
         if: env.NEW_VERSION != ''
@@ -91,5 +98,4 @@ jobs:
           git add ${{ env.NAME_VERSION_FILE }} version/version_log CHANGELOG.md
           git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog"
 
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
-          
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
