@@ -11,6 +11,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check SONAR_TOKEN presence
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "SONAR_TOKEN is not set!"
+            exit 1
+          else
+            echo "SONAR_TOKEN is set (value masked)."
+          fi
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
       # Установка Python (если нужно)
       - name: Set up Python
         uses: actions/setup-python@v4
