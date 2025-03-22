@@ -7,3 +7,7 @@
 - Merge branch 'feature/test_workflows' of https://github.com/NickNameYouTuber/messenger-app into feature/test_workflows
 - Bump version to 0.7.0 and update changelog with all commits
 
+## [0.9.0] - 22.03.2025 20:34:20
+
+- Test2
+
