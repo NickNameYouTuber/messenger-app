@@ -1,4 +1,3 @@
-# .github/workflows/versioning.yml
 name: Versioning and Changelog
 
 on:
@@ -19,27 +18,23 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      # Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      # Get branch name
       - name: Extract branch name
         id: branch-names
         run: |
           BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\///')
           echo "current_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
-      # Update version for feature branches (minor)
       - name: Update version [minor]
         if: startsWith(steps.branch-names.outputs.current_branch, 'feature')
         run: |
@@ -47,7 +42,6 @@ jobs:
           VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
           echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # Update version for hotfix branches (patch)
       - name: Update version [patch]
         if: startsWith(steps.branch-names.outputs.current_branch, 'hotfix')
         run: |
@@ -55,36 +49,34 @@ jobs:
           VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
           echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # Обновление changelog с перечислением всех коммитов после последнего пуша
+      - name: Get all commits since last push
+        if: env.NEW_VERSION != ''
+        id: commits
+        run: |
+          # Получаем все коммиты с последнего пуша
+          COMMIT_MESSAGES=$(git log HEAD^..HEAD --pretty=format:"%s" | sed 's/^/- /')
+          echo "messages<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MESSAGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Update Changelog
         if: env.NEW_VERSION != ''
         run: |
           TIMESTAMP=$(date '+%d.%m.%Y %H:%M:%S')
           CHANGELOG_FILE="CHANGELOG.md"
           
-          # Создание changelog, если он отсутствует
+          # Создаем changelog если его нет
           if [ ! -f "$CHANGELOG_FILE" ]; then
             echo "# Changelog" > $CHANGELOG_FILE
             echo "" >> $CHANGELOG_FILE
           fi
           
-          # Определяем, существует ли удалённая ветка
-          if git rev-parse --verify --quiet "origin/${GITHUB_REF#refs/heads/}"; then
-            COMMITS=$(git log origin/${GITHUB_REF#refs/heads/}..HEAD --pretty=format:"- %s")
-          else
-            # Если удалённой ветки ещё нет, берём все коммиты
-            COMMITS=$(git log --pretty=format:"- %s")
-          fi
+          # Добавляем новую запись с версией и всеми коммитами
+          echo "## [${{ env.NEW_VERSION }}] - $TIMESTAMP" >> $CHANGELOG_FILE
+          echo "" >> $CHANGELOG_FILE
+          echo "${{ steps.commits.outputs.messages }}" >> $CHANGELOG_FILE
+          echo "" >> $CHANGELOG_FILE
 
-          # Добавляем новую запись в changelog
-          {
-            echo "## [${{ env.NEW_VERSION }}] - $TIMESTAMP"
-            echo ""
-            echo "$COMMITS"
-            echo ""
-          } >> $CHANGELOG_FILE
-
-      # Проверка наличия PAT_TOKEN
       - name: Check PAT_TOKEN existence
         run: |
           if [ -z "${{ secrets.PAT_TOKEN }}" ]; then
@@ -92,12 +84,11 @@ jobs:
             exit 1
           fi
 
-      # Commit version and changelog
       - name: Commit version and changelog
         if: env.NEW_VERSION != ''
         run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git add ${{ env.NAME_VERSION_FILE }} version/version_log CHANGELOG.md
-          git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog"
+          git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog with all commits"
           git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
