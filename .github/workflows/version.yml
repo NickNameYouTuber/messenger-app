@@ -65,7 +65,9 @@ jobs:
             PREV_COMMIT=$(git rev-parse HEAD~1)
           fi
           COMMIT_MSG=$(git log ${PREV_COMMIT}..HEAD --pretty=format:"- %s")
-          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           # Обновляем файл с последним коммитом для будущих запусков
           git rev-parse HEAD > .last_commit
 
@@ -97,4 +99,3 @@ jobs:
           git add ${{ env.NAME_VERSION_FILE }} version/version_log changelog.md .last_commit
           git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog"
           git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
-
