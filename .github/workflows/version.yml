@@ -18,23 +18,27 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      # Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      # Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
+      # Get branch name
       - name: Extract branch name
         id: branch-names
         run: |
           BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\///')
           echo "current_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
+      # Update version for feature branches (minor)
       - name: Update version [minor]
         if: startsWith(steps.branch-names.outputs.current_branch, 'feature')
         run: |
@@ -42,6 +46,7 @@ jobs:
           VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
           echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
 
+      # Update version for hotfix branches (patch)
       - name: Update version [patch]
         if: startsWith(steps.branch-names.outputs.current_branch, 'hotfix')
         run: |
@@ -49,47 +54,46 @@ jobs:
           VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
           echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Get all commits since last push
-        if: env.NEW_VERSION != ''
-        id: commits
+      # Get commit messages from previous commit until current HEAD
+      - name: Get commit messages
+        id: commit
         run: |
-          # Получаем все коммиты с последнего пуша
-          COMMIT_MESSAGES=$(git log HEAD^..HEAD --pretty=format:"%s" | sed 's/^/- /')
-          echo "messages<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMIT_MESSAGES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          if [ -f .last_commit ]; then
+            PREV_COMMIT=$(cat .last_commit)
+          else
+            # Если файл не найден, берем предыдущий коммит относительно HEAD
+            PREV_COMMIT=$(git rev-parse HEAD~1)
+          fi
+          COMMIT_MSG=$(git log ${PREV_COMMIT}..HEAD --pretty=format:"- %s")
+          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          # Обновляем файл с последним коммитом для будущих запусков
+          git rev-parse HEAD > .last_commit
 
+      # Update changelog
       - name: Update Changelog
         if: env.NEW_VERSION != ''
         run: |
           TIMESTAMP=$(date '+%d.%m.%Y %H:%M:%S')
-          CHANGELOG_FILE="changelog.md"
+          CHANGELOG_FILE="CHANGELOG.md"
           
-          # Создаем changelog если его нет
+          # Create changelog if it doesn't exist
           if [ ! -f "$CHANGELOG_FILE" ]; then
             echo "# Changelog" > $CHANGELOG_FILE
             echo "" >> $CHANGELOG_FILE
           fi
           
-          # Добавляем новую запись с версией и всеми коммитами
+          # Add new entry
           echo "## [${{ env.NEW_VERSION }}] - $TIMESTAMP" >> $CHANGELOG_FILE
           echo "" >> $CHANGELOG_FILE
-          echo "${{ steps.commits.outputs.messages }}" >> $CHANGELOG_FILE
+          echo "${{ steps.commit.outputs.message }}" >> $CHANGELOG_FILE
           echo "" >> $CHANGELOG_FILE
 
-      - name: Check PAT_TOKEN existence
-        run: |
-          if [ -z "${{ secrets.PAT_TOKEN }}" ]; then
-            echo "Error: PAT_TOKEN is not set"
-            exit 1
-          fi
-
+      # Commit changes
       - name: Commit version and changelog
         if: env.NEW_VERSION != ''
         run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
-          git add ${{ env.NAME_VERSION_FILE }} version/version_log changelog.md
-          git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog with all commits"
+          git add ${{ env.NAME_VERSION_FILE }} version/version_log CHANGELOG.md .last_commit
+          git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog"
           git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
-
