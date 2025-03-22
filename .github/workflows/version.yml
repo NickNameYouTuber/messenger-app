@@ -55,31 +55,34 @@ jobs:
           VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
           echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # Get commit message
-      - name: Get commit message
-        id: commit
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-
-      # Update changelog
+      # Обновление changelog с перечислением всех коммитов после последнего пуша
       - name: Update Changelog
         if: env.NEW_VERSION != ''
         run: |
           TIMESTAMP=$(date '+%d.%m.%Y %H:%M:%S')
           CHANGELOG_FILE="CHANGELOG.md"
           
-          # Create changelog if it doesn't exist
+          # Создание changelog, если он отсутствует
           if [ ! -f "$CHANGELOG_FILE" ]; then
             echo "# Changelog" > $CHANGELOG_FILE
             echo "" >> $CHANGELOG_FILE
           fi
           
-          # Add new entry
-          echo "## [${{ env.NEW_VERSION }}] - $TIMESTAMP" >> $CHANGELOG_FILE
-          echo "" >> $CHANGELOG_FILE
-          echo "- ${{ steps.commit.outputs.message }}" >> $CHANGELOG_FILE
-          echo "" >> $CHANGELOG_FILE
+          # Определяем, существует ли удалённая ветка
+          if git rev-parse --verify --quiet "origin/${GITHUB_REF#refs/heads/}"; then
+            COMMITS=$(git log origin/${GITHUB_REF#refs/heads/}..HEAD --pretty=format:"- %s")
+          else
+            # Если удалённой ветки ещё нет, берём все коммиты
+            COMMITS=$(git log --pretty=format:"- %s")
+          fi
+
+          # Добавляем новую запись в changelog
+          {
+            echo "## [${{ env.NEW_VERSION }}] - $TIMESTAMP"
+            echo ""
+            echo "$COMMITS"
+            echo ""
+          } >> $CHANGELOG_FILE
 
       # Проверка наличия PAT_TOKEN
       - name: Check PAT_TOKEN existence
@@ -89,7 +92,7 @@ jobs:
             exit 1
           fi
 
-      # Commit changes
+      # Commit version and changelog
       - name: Commit version and changelog
         if: env.NEW_VERSION != ''
         run: |
@@ -97,6 +100,4 @@ jobs:
           git config user.email "action@github.com"
           git add ${{ env.NAME_VERSION_FILE }} version/version_log CHANGELOG.md
           git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog"
-
           git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
-
