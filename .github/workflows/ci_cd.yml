@@ -9,7 +9,6 @@ on:
 jobs:
   test-and-notify:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,11 +30,6 @@ jobs:
         working-directory: ./frontend
         continue-on-error: true
 
-      # Вызов Reusable Workflow для анализа через SonarCloud
-      sonar-analysis:
-      uses: ./.github/workflows/sonar-analysis.yml
-      needs: test-and-notify  # Зависит от задачи test-and-notify
-
       # Label | test-passed
       - name: Add label "test-passed"
         uses: actions/github-script@v6
@@ -47,8 +41,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               labels: ["test-passed"]
-            });  
-
+            });
 
       # Отправляем отдельное уведомление в Telegram для каждого теста
       - name: Send individual Telegram notifications for frontend tests
@@ -126,20 +119,23 @@ jobs:
         with:
           server_address: ${{ secrets.SMTP_SERVER }}
           server_port: 465
-          username: ${{ secrets.SMTP_USER }}  # Ваш email, например, 123ababab123ababab@gmail.com
-          password: ${{ secrets.SMTP_PASSWORD }}  # Ваш пароль, например, 85B4672943B05596B50650A86554840FBFDE
-          from: ${{ secrets.SMTP_USER }}  # Тот же email, что и username
-          to: ${{ secrets.EMAIL_RECIPIENT }}  # Адрес получателя
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          from: ${{ secrets.SMTP_USER }}
+          to: ${{ secrets.EMAIL_RECIPIENT }}
           subject: Test Results - ${{ github.ref_name }}
           body: |
             The test results are as follows:
-            ${{ env.MESSAGE }}  # Переменная с результатами тестов
-          secure: true  # Отключаем прямое SSL, используем STARTTLS
+            ${{ env.MESSAGE }}
+          secure: true
 
     outputs:
       test_status: ${{ env.STATUS }}
 
-  # Завершающая проверка, которая завершает workflow с ошибкой, если тесты не прошли
+  sonar-analysis:
+    needs: test-and-notify
+    uses: ./.github/workflows/sonar-analysis.yml
+
   status:
     needs: test-and-notify
     runs-on: ubuntu-latest
