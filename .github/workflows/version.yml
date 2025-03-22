@@ -99,3 +99,4 @@ jobs:
           git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog"
 
           git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+
