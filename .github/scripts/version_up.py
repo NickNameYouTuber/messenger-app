@@ -2,22 +2,24 @@ import sys
 import os
 from datetime import datetime
 
-# Имена файлов
+
 VERSION_FILE = 'version/version'
 VERSION_LOG_FILE = 'version/version_log'
 LOGS_FILE = 'version/logs'
+
 
 # Получение текущего времени в формате "дд.мм.гггг чч:мм:сс.мс"
 def get_current_timestamp():
     now = datetime.now()
     return now.strftime('%d.%m.%Y %H:%M:%S.') + f'{now.microsecond // 1000:03d}'
 
+
 # Добавление строки в начало файла
 def prepend_to_file(filename, content):
     directory = os.path.dirname(filename)
     if directory and not os.path.exists(directory):
         os.makedirs(directory)
-    
+
     existing = ''
     if os.path.exists(filename):
         with open(filename, 'r') as f:
@@ -26,6 +28,7 @@ def prepend_to_file(filename, content):
         f.write(content)
         if existing:
             f.write('\n' + existing)
+
 
 # Чтение текущей версии
 def read_current_version():
@@ -43,14 +46,17 @@ def read_current_version():
         write_version(default_version)
         return default_version
 
+
 # Запись версии в файл
 def write_version(version):
     with open(VERSION_FILE, 'w') as f:
         f.write(version)
 
+
 # Вывод текущей версии
 def print_version():
     print(read_current_version())
+
 
 # Вывод списка команд
 def print_help():
@@ -65,6 +71,7 @@ def print_help():
     version_log      - Показать логи смены версий (используйте -n для вывода n записей)
     log              - Показать все логи (используйте -n для вывода n записей)"""
     print(help_text)
+
 
 # Обновление версии
 def update_version(update_type):
@@ -86,13 +93,14 @@ def update_version(update_type):
     prepend_to_file(VERSION_LOG_FILE, log_entry)
     print(f"Версия обновлена до {new_version}")
 
+
 # Сброс версии и логов
 def drop_version():
     for file in [VERSION_FILE, VERSION_LOG_FILE, LOGS_FILE]:
         directory = os.path.dirname(file)
         if directory and not os.path.exists(directory):
             os.makedirs(directory)
-    
+
     write_version('0.0.1')
     open(VERSION_LOG_FILE, 'w').close()
     open(LOGS_FILE, 'w').close()
@@ -103,9 +111,10 @@ def clear_logs():
     directory = os.path.dirname(LOGS_FILE)
     if directory and not os.path.exists(directory):
         os.makedirs(directory)
-    
+
     open(LOGS_FILE, 'w').close()
     print("Логи команд очищены.")
+
 
 # Откат к предыдущей версии
 def undo_version():
@@ -119,7 +128,7 @@ def undo_version():
     except FileNotFoundError:
         print("Ошибка: Лог версий пуст.")
         return
-    
+
     parts = latest_line.split(' <- ')
     if len(parts) != 2:
         print("Ошибка: Неверный формат записи в логе.")
@@ -137,6 +146,7 @@ def undo_version():
     log_entry = f'[{old_version}] <- [{new_version}] [{timestamp}] undo'
     prepend_to_file(VERSION_LOG_FILE, log_entry)
     print(f"Версия откачена до {old_version}")
+
 
 # Вывод логов смены версий
 def show_version_log(n=None):
@@ -168,13 +178,22 @@ def show_logs(n=None):
     except FileNotFoundError:
         print("Логи пусты.")
 
+
 # Основная функция
 def main():
+    global VERSION_FILE  # чтобы можно было изменить глобальную переменную
     if len(sys.argv) < 2:
         print("Ошибка: Команда не указана. Используйте 'help' для списка команд.")
         sys.exit(1)
-    
-    command_args = sys.argv[1:]
+
+    # Если передано 2 и более аргументов, предполагаем, что первый аргумент – это путь к файлу версии,
+    # а второй – команда.
+    if len(sys.argv) >= 3:
+        VERSION_FILE = sys.argv[1]
+        command_args = sys.argv[2:]
+    else:
+        command_args = sys.argv[1:]
+
     log_entry = ' '.join(command_args)
     timestamp = get_current_timestamp()
 
@@ -182,7 +201,7 @@ def main():
 
     if command != "log":
         prepend_to_file(LOGS_FILE, f'[{timestamp}] {log_entry}')
-    
+
     if command == 'version':
         print_version()
     elif command == 'help':
@@ -217,5 +236,7 @@ def main():
         print(f"Ошибка: Неизвестная команда '{command}'. Используйте 'help' для списка команд.")
         sys.exit(1)
 
+
 if __name__ == '__main__':
     main()
+

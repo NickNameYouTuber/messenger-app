@@ -31,6 +31,25 @@ jobs:
         working-directory: ./frontend
         continue-on-error: true
 
+      # Вызов Reusable Workflow для анализа через SonarCloud
+      sonar-analysis:
+      uses: ./.github/workflows/sonar-analysis.yml
+      needs: test-and-notify  # Зависит от задачи test-and-notify
+
+      # Label | test-passed
+      - name: Add label "test-passed"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.addLabels({
+              issue_number: context.payload.pull_request?.number || context.payload.issue?.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ["test-passed"]
+            });  
+
+
       # Отправляем отдельное уведомление в Telegram для каждого теста
       - name: Send individual Telegram notifications for frontend tests
         env:
@@ -119,11 +138,6 @@ jobs:
 
     outputs:
       test_status: ${{ env.STATUS }}
-      
-  # Вызов Reusable Workflow для анализа через SonarCloud
-  sonar-analysis:
-    uses: ./.github/workflows/sonar-analysis.yml
-    needs: test-and-notify  # Зависит от задачи test-and-notify
 
   # Завершающая проверка, которая завершает workflow с ошибкой, если тесты не прошли
   status:
