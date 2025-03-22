@@ -4,3 +4,7 @@
 
 - Update version.yml
 
+## [0.2.0] - 22.03.2025 20:14:30
+
+- Update version.yml
+
