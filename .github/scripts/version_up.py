@@ -2,7 +2,7 @@ import sys
 import os
 from datetime import datetime
 
-# Имена файлов по умолчанию
+
 VERSION_FILE = 'version/version'
 VERSION_LOG_FILE = 'version/version_log'
 LOGS_FILE = 'version/logs'
@@ -106,7 +106,6 @@ def drop_version():
     open(LOGS_FILE, 'w').close()
     print("Версия сброшена до 0.0.1, все логи очищены.")
 
-
 # Очистка логов команд
 def clear_logs():
     directory = os.path.dirname(LOGS_FILE)
@@ -163,7 +162,6 @@ def show_version_log(n=None):
                 print(line)
     except FileNotFoundError:
         print("Лог версий пуст.")
-
 
 # Вывод всех логов
 def show_logs(n=None):
@@ -241,3 +239,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

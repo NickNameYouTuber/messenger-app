@@ -3,6 +3,7 @@ sonar:
   projectKey: messenger-app
   projectName: NickNameYouTuber_messenger-app
 
+
   sources:
     - frontend/src
     - backend/src

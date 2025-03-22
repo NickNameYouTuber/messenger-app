@@ -49,6 +49,7 @@ jobs:
               labels: ["test-passed"]
             });  
 
+
       # Отправляем отдельное уведомление в Telegram для каждого теста
       - name: Send individual Telegram notifications for frontend tests
         env:
