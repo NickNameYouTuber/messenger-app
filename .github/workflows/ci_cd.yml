@@ -36,12 +36,24 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            await github.rest.issues.addLabels({
-              issue_number: context.payload.pull_request?.number || context.payload.issue?.number,
+            const branch = context.ref.replace('refs/heads/', '');
+            const pulls = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              labels: ["test-passed"]
+              state: 'open',
+              head: `${context.repo.owner}:${branch}`
             });
+            if (pulls.data.length > 0) {
+              const pullNumber = pulls.data[0].number;
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["test-passed"]
+              });
+            } else {
+              console.log("No open pull request found for branch:", branch);
+            }
 
       # Отправляем отдельное уведомление в Telegram для каждого теста
       - name: Send individual Telegram notifications for frontend tests
@@ -135,6 +147,7 @@ jobs:
   sonar-analysis:
     needs: test-and-notify
     uses: ./.github/workflows/sonar-analysis.yml
+    secrets: inherit
 
   status:
     needs: test-and-notify
