@@ -11,17 +11,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check SONAR_TOKEN presence
-        run: |
-          if [ -z "$SONAR_TOKEN" ]; then
-            echo "SONAR_TOKEN is not set!"
-            exit 1
-          else
-            echo "SONAR_TOKEN is set (value masked)."
-          fi
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
       # Установка Python (если нужно)
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -36,7 +25,7 @@ jobs:
 
       # Анализ через SonarCloud
       - name: SonarCloud Scan
-        uses: sonarsource/sonarcloud-github-action@v1
+        uses: sonarsource/sonarcloud-github-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
