@@ -31,10 +31,11 @@ jobs:
         working-directory: ./frontend
         continue-on-error: true
 
-      # Вызов Reusable Workflow для анализа через SonarCloud
-      sonar-analysis:
-      uses: ./.github/workflows/sonar-analysis.yml
-      needs: test-and-notify  # Зависит от задачи test-and-notify
+
+        sonar-analysis:
+        uses: ./.github/workflows/sonar-analysis.yml
+        needs: test-and-notify  # Зависит от задачи test-and-notify
+
 
       # Label | test-passed
       - name: Add label "test-passed"
