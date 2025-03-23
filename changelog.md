@@ -15,6 +15,7 @@
 - Test1
 - Bump version to 0.13.0 and update changelog
 
+
 ## [0.15.0] - 23.03.2025 16:44:30
 
 - feature/upgrade_frontend Change to react
@@ -38,4 +39,3 @@
 - Feature/test workflows (#47)
 - Update ci_cd.yml
 - Develop (#46)
-
