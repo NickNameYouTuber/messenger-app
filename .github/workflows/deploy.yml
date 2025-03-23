@@ -29,8 +29,10 @@ jobs:
       - name: Deploy via SSH
         run: |
           ssh -p 2222 -i ~/.ssh/deploy_key nick@37.252.17.138 << 'EOF'
+            set -e
             cd /home/nick/project
             docker compose pull
             docker compose up -d --build
+            exit
           EOF
         shell: bash
