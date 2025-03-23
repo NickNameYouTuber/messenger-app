@@ -12,47 +12,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 1: Make a test SSH connection with detailed debugging
-      - name: Test SSH Connection
-        uses: appleboy/ssh-action@master
-        with:
-          host: 37.252.17.138
-          username: nick
-          key: ${{ secrets.DEPLOY_KEY }}
-          port: 2222
-          script: |
-            echo "Connection successful"
-            pwd
-            whoami
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p 2222 37.252.17.138 >> ~/.ssh/known_hosts
 
-      # Step 2: Copy files using scp-action
-      - name: Copy files via SCP
-        uses: appleboy/scp-action@master
-        with:
-          host: 37.252.17.138
-          username: nick
-          key: ${{ secrets.DEPLOY_KEY }}
-          port: 2222
-          source: "./"
-          target: "/home/nick/project/"
-          rm: false
-          strip_components: 0
-          overwrite: true
-          timeout: 240s
-          exclude: |
-            .git/**
-            .github/**
-            node_modules/**
+      - name: Copy project files to server
+        run: |
+          rsync -avz -e "ssh -p 2222 -i ~/.ssh/deploy_key" \
+            --exclude='.git' --exclude='.github' --exclude='node_modules' \
+            ./ nick@37.252.17.138:/home/nick/project/
+        shell: bash
 
-      # Step 3: Run Docker Compose commands
-      - name: Deploy with Docker Compose
-        uses: appleboy/ssh-action@master
-        with:
-          host: 37.252.17.138
-          username: nick
-          key: ${{ secrets.DEPLOY_KEY }}
-          port: 2222
-          script: |
+      - name: Deploy via SSH
+        run: |
+          ssh -p 2222 -i ~/.ssh/deploy_key nick@37.252.17.138 << 'EOF'
             cd /home/nick/project
             docker compose pull
             docker compose up -d --build
+          EOF
+        shell: bash
