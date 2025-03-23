@@ -1,0 +1,36 @@
+name: Deploy Docker Compose Project
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p 2222 37.252.17.138 >> ~/.ssh/known_hosts
+
+      - name: Copy project files to server
+        run: |
+          rsync -avz -e "ssh -p 2222 -i ~/.ssh/deploy_key" \
+            --exclude='.git' --exclude='.github' --exclude='node_modules' \
+            ./ nick@37.252.17.138:/home/nick/project/
+        shell: bash
+
+      - name: Deploy via SSH
+        run: |
+          ssh -p 2222 -i ~/.ssh/deploy_key nick@37.252.17.138 << 'EOF'
+            cd /home/nick/project
+            docker compose pull
+            docker compose up -d --build
+          EOF
+        shell: bash

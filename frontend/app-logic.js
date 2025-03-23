@@ -1,5 +1,5 @@
 // app-logic.js
-async function fetchCityTime(city) {
+export async function fetchCityTime(city) {
     try {
         const response = await fetch(`/api/v1/get_time?city=${encodeURIComponent(city)}`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -11,7 +11,7 @@ async function fetchCityTime(city) {
     }
 }
 
-async function fetchCityImage(city) {
+export async function fetchCityImage(city) {
     try {
         const response = await fetch(`/api/v1/get_image?city=${encodeURIComponent(city)}`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -23,7 +23,7 @@ async function fetchCityImage(city) {
     }
 }
 
-function addToSearchHistory(city, searchHistory) {
+export function addToSearchHistory(city, searchHistory) {
     const updatedHistory = searchHistory.filter(item => item.toLowerCase() !== city.toLowerCase());
     updatedHistory.unshift(city);
     if (updatedHistory.length > 10) updatedHistory.pop();
@@ -34,4 +34,4 @@ module.exports = {
     fetchCityTime,
     fetchCityImage,
     addToSearchHistory
-};
+  };

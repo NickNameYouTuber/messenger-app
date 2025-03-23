@@ -1,5 +1,5 @@
 // app.js
-const { fetchCityTime, fetchCityImage, addToSearchHistory } = require('./app-logic.js');
+import { fetchCityTime, fetchCityImage, addToSearchHistory } from './app-logic.js';
 
 const elements = {
     cityInput: document.getElementById('city-input'),
