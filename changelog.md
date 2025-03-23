@@ -68,3 +68,9 @@
 - Update jest.config.js
 - Bump version to 0.19.0 and update changelog
 
+## [0.21.0] - 23.03.2025 17:52:10
+
+- Merge branch 'feature/upgrade_frontend' of https://github.com/NickNameYouTuber/messenger-app into feature/upgrade_frontend
+- Update Dockerfile
+- Bump version to 0.20.0 and update changelog
+
