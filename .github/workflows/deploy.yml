@@ -12,27 +12,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup SSH key
-        uses: webfactory/ssh-agent@v0.7.0
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
         with:
-          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          known_hosts: 'just-a-placeholder-so-we-dont-get-errors'
+          config: |
+            Host deployment-server
+              HostName 37.252.17.138
+              User nick
+              Port 2222
+              StrictHostKeyChecking no
 
-      - name: Add host key
+      - name: Debug connection
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p 2222 37.252.17.138 >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
+          echo "Testing connection to server..."
+          ssh -v deployment-server "echo Connection successful"
+        continue-on-error: true
 
       - name: Copy project files to server
         run: |
-          rsync -avz -e "ssh -p 2222" \
+          rsync -avz \
             --exclude='.git' --exclude='.github' --exclude='node_modules' \
-            ./ nick@37.252.17.138:/home/nick/project/
+            ./ deployment-server:/home/nick/project/
         shell: bash
 
       - name: Deploy via SSH
         run: |
-          ssh -p 2222 nick@37.252.17.138 << 'EOF'
+          ssh deployment-server << 'EOF'
             cd /home/nick/project
             docker compose pull
             docker compose up -d --build
