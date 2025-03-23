@@ -79,3 +79,9 @@
 - Fix
 - Bump version to 0.21.0 and update changelog
 
+## [0.23.0] - 23.03.2025 18:20:23
+
+- Merge branch 'develop' into feature/upgrade_frontend
+- Bump version to 0.22.0 and update changelog
+- Merge branch 'master' into develop
+
