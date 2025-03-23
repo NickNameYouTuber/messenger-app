@@ -23,10 +23,10 @@ jobs:
         run: npm install
         working-directory: ./frontend
 
-      # Запускаем Jest с выводом отчёта в JSON
-      - name: Run Jest tests
+      # Запускаем npm test с выводом отчёта в JSON
+      - name: Run npm tests
         id: frontend-tests
-        run: npx jest --json --outputFile=jest-results.json --verbose
+        run: npm test -- --json --outputFile=jest-results.json --verbose
         working-directory: ./frontend
         continue-on-error: true
 
