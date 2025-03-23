@@ -17,8 +17,8 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          chmod 700 ~/.ssh
           ssh-keyscan -p 2222 37.252.17.138 >> ~/.ssh/known_hosts
-        shell: bash
 
       - name: Copy project files to server
         run: |
