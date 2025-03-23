@@ -4,11 +4,7 @@ import './App.css';
 
 function App() {
   return (
-    <div className="container">
-      <header>
-        <h1>Время городов мира</h1>
-        <p>Введите название города, чтобы узнать текущее время и увидеть фотографию</p>
-      </header>
+    <div className="app">
       <CitySearch />
     </div>
   );

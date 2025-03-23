@@ -1,17 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { fetchCityTime, fetchCityImage, addToSearchHistory } from '../utils/api';
+import { fetchCityTime, fetchCityImage } from '../utils/api';
 
 function CitySearch() {
   const [city, setCity] = useState('');
-  const [searchHistory, setSearchHistory] = useState(
-    JSON.parse(localStorage.getItem('citySearchHistory')) || []
-  );
-  const [result, setResult] = useState(null);
+  const [currentCity, setCurrentCity] = useState(null);
+  const [time, setTime] = useState(null);
+  const [image, setImage] = useState(null);
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [searchHistory, setSearchHistory] = useState([]);
 
+  // Load search history from localStorage on component mount
   useEffect(() => {
-    localStorage.setItem('citySearchHistory', JSON.stringify(searchHistory));
+    try {
+      const savedHistory = localStorage.getItem('searchHistory');
+      if (savedHistory) {
+        setSearchHistory(JSON.parse(savedHistory));
+      } else {
+        setSearchHistory([]);
+      }
+    } catch (e) {
+      console.error('Error loading search history from localStorage:', e);
+      setSearchHistory([]);
+    }
+  }, []);
+
+  // Save search history to localStorage when it changes
+  useEffect(() => {
+    if (searchHistory && searchHistory.length > 0) {
+      localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
+    }
   }, [searchHistory]);
 
   const handleSearch = async () => {
@@ -21,94 +39,101 @@ function CitySearch() {
     }
 
     setLoading(true);
-    setError('');
-    setResult(null);
+    setError(null);
 
     try {
-      const [timeData, imageData] = await Promise.all([
-        fetchCityTime(city),
-        fetchCityImage(city)
-      ]);
+      const cityTime = await fetchCityTime(city);
+      const cityImage = await fetchCityImage(city);
 
-      if (timeData) {
-        setResult({
-          city,
-          time: timeData,
-          imageUrl: imageData,
-          timestamp: new Date().toLocaleTimeString()
+      setTime(cityTime);
+      setImage(cityImage);
+      setCurrentCity(city);
+      
+      // Add to search history if not already exists
+      if (!searchHistory.includes(city)) {
+        setSearchHistory(prev => {
+          const newHistory = [...prev, city];
+          // Keep only the last 5 searches
+          return newHistory.slice(-5);
         });
-        setSearchHistory(prev => addToSearchHistory(city, prev));
-      } else {
-        setError('Не удалось получить информацию о городе');
       }
-    } catch (err) {
-      setError('Произошла ошибка при получении данных');
-      console.error('Error fetching city data:', err);
+    } catch (error) {
+      setError(`Ошибка: ${error.message || 'Не удалось получить данные'}`);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleInputChange = (e) => {
+    setCity(e.target.value);
+  };
+
   const handleHistoryClick = (historyCity) => {
     setCity(historyCity);
-    handleSearch();
+    // Optionally auto-search when clicking on history item
+    // Uncomment the next line if you want this behavior
+    // setTimeout(() => handleSearch(), 0);
+  };
+
+  const handleClearHistory = () => {
+    setSearchHistory([]);
+    localStorage.removeItem('searchHistory');
   };
 
   return (
-    <>
+    <div className="container">
+      <header>
+        <h1>Время городов мира</h1>
+        <p>Введите название города, чтобы узнать текущее время и увидеть фотографию</p>
+      </header>
+
       <div className="search-container">
-        <input
-          type="text"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          placeholder="Введите название города..."
+        <input 
+          type="text" 
+          value={city} 
+          onChange={handleInputChange} 
+          placeholder="Введите название города..." 
           aria-label="Название города"
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
         />
         <button onClick={handleSearch}>Поиск</button>
       </div>
 
-      {loading && <div className="loading">Загрузка данных...</div>}
-      {error && <div className="error-message">{error}</div>}
-
-      {result && (
-        <div className="result-card">
-          <div className="city-info">
-            <div className="time-info">
-              <h2 className="city-name">{result.city}</h2>
-              <div className="city-time">{result.time}</div>
-              <div id="updated-time">Обновлено: <span>{result.timestamp}</span></div>
-            </div>
-            <div className="image-container">
-              {result.imageUrl ? (
-                <img
-                  src={result.imageUrl}
-                  alt={`Фото города ${result.city}`}
-                  className="city-image"
-                />
-              ) : (
-                <p className="no-image">Фотография города не найдена</p>
-              )}
-            </div>
-          </div>
+      {loading && <div className="loading">Загрузка...</div>}
+      
+      {error && <div className="error">{error}</div>}
+      
+      {currentCity && time && !loading && (
+        <div className="result">
+          <h2>{currentCity}</h2>
+          <p className="time">{time}</p>
+          {image && <img src={image} alt={`Фото города ${currentCity}`} />}
         </div>
       )}
 
       <div className="history">
         <h2>История поиска</h2>
         <ul className="history-list">
-          {searchHistory.map((historyCity, index) => (
-            <li
-              key={index}
-              className="history-item"
-              onClick={() => handleHistoryClick(historyCity)}
-            >
-              {historyCity}
-            </li>
-          ))}
+          {searchHistory && searchHistory.length > 0 ? (
+            searchHistory.map((historyCity, index) => (
+              <li
+                key={index}
+                className="history-item"
+                onClick={() => handleHistoryClick(historyCity)}
+              >
+                {historyCity}
+              </li>
+            ))
+          ) : (
+            <li className="empty-history">История поиска пуста</li>
+          )}
         </ul>
+        {searchHistory && searchHistory.length > 0 && (
+          <button className="clear-history" onClick={handleClearHistory}>
+            Очистить историю
+          </button>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
