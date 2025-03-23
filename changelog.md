@@ -50,3 +50,9 @@
 - feature/upgrade_frontend Fix tests
 - Bump version to 0.16.0 and update changelog
 
+## [0.18.0] - 23.03.2025 17:44:11
+
+- Merge branch 'feature/upgrade_frontend' of https://github.com/NickNameYouTuber/messenger-app into feature/upgrade_frontend
+- feature/upgrade_frontend Fix Dockerfile and ci_cd.yml
+- Bump version to 0.17.0 and update changelog
+
