@@ -74,3 +74,8 @@
 - Update Dockerfile
 - Bump version to 0.20.0 and update changelog
 
+## [0.22.0] - 23.03.2025 18:18:55
+
+- Fix
+- Bump version to 0.21.0 and update changelog
+
