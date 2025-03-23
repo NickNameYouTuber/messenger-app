@@ -24,9 +24,18 @@ jobs:
         working-directory: ./frontend
 
       # Запускаем npm test с выводом отчёта в JSON
-      - name: Run npm tests
+      - name: Run Jest tests
         id: frontend-tests
-        run: npm test -- --json --outputFile=jest-results.json --verbose
+        run: |
+          # Check if babel.config.js exists and fix it if needed
+          if [ -f babel.config.js ]; then
+            # Check if it uses export default
+            if grep -q "export default" babel.config.js; then
+              # Convert to CommonJS syntax
+              sed -i 's/export default/module.exports =/' babel.config.js
+            fi
+          fi
+          npm test -- --json --outputFile=jest-results.json --verbose
         working-directory: ./frontend
         continue-on-error: true
 
