@@ -15,3 +15,27 @@
 - Test1
 - Bump version to 0.13.0 and update changelog
 
+## [0.15.0] - 23.03.2025 16:44:30
+
+- feature/upgrade_frontend Change to react
+- Fix errors
+- Update nginx.conf
+- Fix bundle.js:1 Uncaught Error
+- Fix error Failed to load '/app/webpack.config.js' config
+- Update Dockerfile
+- Update deploy
+- Update Dockerfile
+- Update deploy.yml
+- Update deploy.yml
+- Create deploy.yml
+- add push to docker
+- Feature/test workflows (#49) (#50)
+- Update README.md
+- Merge branch 'develop'
+- del test file
+- Develop (#48)
+- Merge branch 'master' into develop
+- Feature/test workflows (#47)
+- Update ci_cd.yml
+- Develop (#46)
+
