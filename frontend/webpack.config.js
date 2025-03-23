@@ -1,10 +1,20 @@
-const path = require('path');
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-module.exports = {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default {
   entry: './app.js',
   output: {
     filename: 'bundle.js',
-    path: path.resolve(__dirname, 'dist')
+    path: path.resolve(__dirname, 'dist'),
+    library: {
+      type: 'module'  // Ensure the output is an ES Module
+    }
   },
-  mode: 'production'
+  experiments: {
+    outputModule: true  // Enable ES Module output
+  },
+  mode: 'production',
+  target: 'web'  // Explicitly target browser environment
 };
