@@ -45,3 +45,8 @@
 - Bump version to 0.15.0 and update changelog
 - Feature/test workflows (#49)
 
+## [0.17.0] - 23.03.2025 17:34:06
+
+- feature/upgrade_frontend Fix tests
+- Bump version to 0.16.0 and update changelog
+
