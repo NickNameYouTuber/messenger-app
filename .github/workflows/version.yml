@@ -1,4 +1,3 @@
-# .github/workflows/versioning.yml
 name: Versioning and Changelog
 
 on:
@@ -25,7 +24,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-
 
       # Set up Python
       - name: Set up Python
@@ -56,19 +54,29 @@ jobs:
           VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
           echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # Get commit message
-      - name: Get commit message
+      # Get commit messages from previous commit until current HEAD
+      - name: Get commit messages
         id: commit
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          if [ -f .last_commit ]; then
+            PREV_COMMIT=$(cat .last_commit)
+          else
+            # Если файл не найден, берем предыдущий коммит относительно HEAD
+            PREV_COMMIT=$(git rev-parse HEAD~1)
+          fi
+          COMMIT_MSG=$(git log ${PREV_COMMIT}..HEAD --pretty=format:"- %s")
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          # Обновляем файл с последним коммитом для будущих запусков
+          git rev-parse HEAD > .last_commit
 
       # Update changelog
       - name: Update Changelog
         if: env.NEW_VERSION != ''
         run: |
           TIMESTAMP=$(date '+%d.%m.%Y %H:%M:%S')
-          CHANGELOG_FILE="CHANGELOG.md"
+          CHANGELOG_FILE="changelog.md"
           
           # Create changelog if it doesn't exist
           if [ ! -f "$CHANGELOG_FILE" ]; then
@@ -79,7 +87,7 @@ jobs:
           # Add new entry
           echo "## [${{ env.NEW_VERSION }}] - $TIMESTAMP" >> $CHANGELOG_FILE
           echo "" >> $CHANGELOG_FILE
-          echo "- ${{ steps.commit.outputs.message }}" >> $CHANGELOG_FILE
+          echo "${{ steps.commit.outputs.message }}" >> $CHANGELOG_FILE
           echo "" >> $CHANGELOG_FILE
 
       # Commit changes
@@ -88,8 +96,6 @@ jobs:
         run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
-          git add ${{ env.NAME_VERSION_FILE }} version/version_log CHANGELOG.md
+          git add ${{ env.NAME_VERSION_FILE }} version/version_log changelog.md .last_commit
           git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog"
-
           git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
-          
