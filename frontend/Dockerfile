@@ -1,18 +1,20 @@
-FROM node:alpine as builder
+# Build stage
+FROM node:22-alpine as builder
+
 WORKDIR /app
-COPY package.json .
+
+COPY package.json package-lock.json ./
 RUN npm install
-COPY app.js .
-COPY app-logic.js .
-COPY webpack.config.js .
+
+COPY . .
 RUN npm run build
 
+# Production stage
 FROM nginx:alpine
-WORKDIR /usr/share/nginx/html
-COPY --from=builder /app/dist/bundle.js /usr/share/nginx/html/
-COPY world-time-city-website.html /usr/share/nginx/html/index.html
-COPY nginx.conf /etc/nginx/nginx.conf
-RUN rm -f /etc/nginx/conf.d/default.conf
-RUN chmod -R 755 /usr/share/nginx/html
+
+COPY --from=builder /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
+
 CMD ["nginx", "-g", "daemon off;"]
