@@ -29,3 +29,9 @@ export function addToSearchHistory(city, searchHistory) {
     if (updatedHistory.length > 10) updatedHistory.pop();
     return updatedHistory;
 }
+
+module.exports = {
+    fetchCityTime,
+    fetchCityImage,
+    addToSearchHistory
+  };
