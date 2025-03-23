@@ -1,25 +1,29 @@
-# Use official nginx alpine as base image (lightweight)
+# Build stage
+FROM node:alpine as builder
+
+WORKDIR /app
+
+COPY package.json .
+COPY package-lock.json .  # If you have one
+RUN npm install
+
+COPY app.js .
+COPY app-logic.js .
+COPY webpack.config.js .
+RUN npm run build
+
+# Production stage
 FROM nginx:alpine
 
-# Set working directory
 WORKDIR /usr/share/nginx/html
 
-# Copy all necessary frontend files
+COPY --from=builder /app/dist/bundle.js /usr/share/nginx/html/
 COPY world-time-city-website.html /usr/share/nginx/html/index.html
-COPY app.js /usr/share/nginx/html/
-COPY app-logic.js /usr/share/nginx/html/
-
-# Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Remove default nginx configuration if it exists
 RUN rm -f /etc/nginx/conf.d/default.conf
-
-# Ensure proper permissions
 RUN chmod -R 755 /usr/share/nginx/html
 
-# Expose port 80
 EXPOSE 80
 
-# Start nginx in foreground
 CMD ["nginx", "-g", "daemon off;"]
