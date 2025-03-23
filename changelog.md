@@ -15,3 +15,73 @@
 - Test1
 - Bump version to 0.13.0 and update changelog
 
+
+## [0.15.0] - 23.03.2025 16:44:30
+
+- feature/upgrade_frontend Change to react
+- Fix errors
+- Update nginx.conf
+- Fix bundle.js:1 Uncaught Error
+- Fix error Failed to load '/app/webpack.config.js' config
+- Update Dockerfile
+- Update deploy
+- Update Dockerfile
+- Update deploy.yml
+- Update deploy.yml
+- Create deploy.yml
+- add push to docker
+- Feature/test workflows (#49) (#50)
+- Update README.md
+- Merge branch 'develop'
+- del test file
+- Develop (#48)
+- Merge branch 'master' into develop
+- Feature/test workflows (#47)
+- Update ci_cd.yml
+- Develop (#46)
+## [0.16.0] - 23.03.2025 17:02:24
+
+- Merge branch 'develop' into feature/upgrade_frontend
+- Bump version to 0.15.0 and update changelog
+- Feature/test workflows (#49)
+
+## [0.17.0] - 23.03.2025 17:34:06
+
+- feature/upgrade_frontend Fix tests
+- Bump version to 0.16.0 and update changelog
+
+## [0.18.0] - 23.03.2025 17:44:11
+
+- Merge branch 'feature/upgrade_frontend' of https://github.com/NickNameYouTuber/messenger-app into feature/upgrade_frontend
+- feature/upgrade_frontend Fix Dockerfile and ci_cd.yml
+- Bump version to 0.17.0 and update changelog
+
+## [0.19.0] - 23.03.2025 17:47:40
+
+- Merge branch 'feature/upgrade_frontend' of https://github.com/NickNameYouTuber/messenger-app into feature/upgrade_frontend
+- feature/upgrade_frontend Fix Dockerfile and ci_cd.yml
+- Bump version to 0.18.0 and update changelog
+
+## [0.20.0] - 23.03.2025 17:49:43
+
+- Merge branch 'feature/upgrade_frontend' of https://github.com/NickNameYouTuber/messenger-app into feature/upgrade_frontend
+- Update jest.config.js
+- Bump version to 0.19.0 and update changelog
+
+## [0.21.0] - 23.03.2025 17:52:10
+
+- Merge branch 'feature/upgrade_frontend' of https://github.com/NickNameYouTuber/messenger-app into feature/upgrade_frontend
+- Update Dockerfile
+- Bump version to 0.20.0 and update changelog
+
+## [0.22.0] - 23.03.2025 18:18:55
+
+- Fix
+- Bump version to 0.21.0 and update changelog
+
+## [0.23.0] - 23.03.2025 18:20:23
+
+- Merge branch 'develop' into feature/upgrade_frontend
+- Bump version to 0.22.0 and update changelog
+- Merge branch 'master' into develop
+
