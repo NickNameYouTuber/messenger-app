@@ -39,3 +39,9 @@
 - Feature/test workflows (#47)
 - Update ci_cd.yml
 - Develop (#46)
+## [0.16.0] - 23.03.2025 17:02:24
+
+- Merge branch 'develop' into feature/upgrade_frontend
+- Bump version to 0.15.0 and update changelog
+- Feature/test workflows (#49)
+
