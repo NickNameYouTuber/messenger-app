@@ -1,4 +1,4 @@
-name: Deploy Docker Compose Project
+name: Deploy to Minikube
 
 on:
   push:
@@ -12,27 +12,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p 2222 37.252.17.138 >> ~/.ssh/known_hosts
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Copy project files to server
+      - name: Build Docker images
         run: |
-          rsync -avz -e "ssh -p 2222 -i ~/.ssh/deploy_key" \
-            --exclude='.git' --exclude='.github' --exclude='node_modules' \
-            ./ nick@37.252.17.138:/home/nick/project/
-        shell: bash
+          docker build -t project-frontend:latest ./frontend
+          docker build -t project-backend:latest ./backend
 
-      - name: Deploy via SSH
+      - name: Install Minikube and dependencies
         run: |
-          ssh -p 2222 -i ~/.ssh/deploy_key nick@37.252.17.138 << 'EOF'
-            set -e
-            cd /home/nick/project
-            docker compose pull
-            docker compose up -d --build
-            exit
-          EOF
-        shell: bash
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y conntrack
+          curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+          sudo install minikube-linux-amd64 /usr/local/bin/minikube
+          minikube config set driver docker
+          minikube start --driver=docker
+          minikube addons enable ingress
+
+      - name: Load images into Minikube
+        run: |
+          minikube image load project-frontend:latest
+          minikube image load project-backend:latest
+
+      - name: Apply Kubernetes configuration
+        run: |
+          kubectl apply -f kubernetes-deployment.yaml
+          kubectl rollout restart deployment/frontend
+          kubectl rollout restart deployment/backend
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -w &
+          kubectl get services
+          minikube service list
+          kubectl rollout status deployment/frontend
+          kubectl rollout status deployment/backend
