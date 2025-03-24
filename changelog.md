@@ -85,3 +85,16 @@
 - Bump version to 0.22.0 and update changelog
 - Merge branch 'master' into develop
 
+## [0.24.0] - 24.03.2025 19:54:24
+
+- add k8s in deploy
+- deploy (#58)
+- Merge branch 'master' into develop
+- Merge pull request #55 from NickNameYouTuber/feature/upgrade_frontend
+- Bump version to 0.23.0 and update changelog
+- Update deploy.yml
+- Update deploy.yml
+- Update deploy.yml
+- Update deploy.yml
+- Feature/test workflows (#49) (#54)
+
