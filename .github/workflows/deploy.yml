@@ -1,4 +1,4 @@
-name: Deploy to Kubernetes via SSH
+name: Deploy to Minikube
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -31,22 +32,27 @@ jobs:
             set -ex
             cd /home/nick/project
             
-            # Сборка Docker образов
+            # Настройка Minikube
+            minikube config set driver docker
+            minikube start --cpus=4 --memory=8192 --disk-size=20g
+            
+            # Сборка образов внутри Minikube
+            eval $(minikube -p minikube docker-env)
             docker build -t project-frontend:latest ./frontend
             docker build -t project-backend:latest ./backend
             
-            # Загрузка образов в Minikube
-            minikube image load project-frontend:latest
-            minikube image load project-backend:latest
-            
-            # Применение Kubernetes конфигурации
+            # Применение конфигурации
             kubectl apply -f kubernetes-deployment.yaml
             
-            # Рестарт деплоев для обновления
+            # Перезапуск деплоев
             kubectl rollout restart deployment/frontend
             kubectl rollout restart deployment/backend
             
-            # Ожидание завершения
-            kubectl rollout status deployment/frontend --timeout=3m
-            kubectl rollout status deployment/backend --timeout=3m
+            # Ожидание обновления
+            kubectl rollout status deployment/frontend --timeout=5m
+            kubectl rollout status deployment/backend --timeout=5m
+            
+            # Проверка статуса
+            kubectl get pods -o wide
+            minikube service list
           EOF
