@@ -98,3 +98,14 @@
 - Update deploy.yml
 - Feature/test workflows (#49) (#54)
 
+## [0.25.0] - 24.03.2025 20:06:54
+
+- Develop (#62)
+- Update CitySearch.js (#60)
+- Update deploy.yml (#59)
+- Update deploy.yml
+- Update index.html
+- Update nginx.conf
+- Update nginx.conf
+- Merge pull request #56 from NickNameYouTuber/develop
+
