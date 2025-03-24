@@ -32,27 +32,21 @@ jobs:
             set -ex
             cd /home/nick/project
             
-            # Настройка Minikube
             minikube config set driver docker
             minikube start --cpus=4 --memory=8192 --disk-size=20g
             
-            # Сборка образов внутри Minikube
             eval $(minikube -p minikube docker-env)
             docker build -t project-frontend:latest ./frontend
             docker build -t project-backend:latest ./backend
             
-            # Применение конфигурации
             kubectl apply -f kubernetes-deployment.yaml
             
-            # Перезапуск деплоев
             kubectl rollout restart deployment/frontend
             kubectl rollout restart deployment/backend
             
-            # Ожидание обновления
             kubectl rollout status deployment/frontend --timeout=5m
             kubectl rollout status deployment/backend --timeout=5m
             
-            # Проверка статуса
             kubectl get pods -o wide
             minikube service list
           EOF
