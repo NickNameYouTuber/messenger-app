@@ -109,3 +109,8 @@
 - Update nginx.conf
 - Merge pull request #56 from NickNameYouTuber/develop
 
+## [0.26.0] - 24.03.2025 20:08:04
+
+- Update ci_cd.yml
+- Bump version to 0.25.0 and update changelog
+
