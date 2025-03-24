@@ -98,9 +98,9 @@
 - Update deploy.yml
 - Feature/test workflows (#49) (#54)
 
-## [0.25.0] - 24.03.2025 20:15:38
 
 - Merge branch 'feature/k8s' of https://github.com/NickNameYouTuber/messenger-app into feature/k8s
 - add k8s in deploy
 - Bump version to 0.24.0 and update changelog
+
 
