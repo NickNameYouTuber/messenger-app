@@ -1,4 +1,4 @@
-name: Deploy to Minikube
+name: Deploy to Kubernetes via SSH
 
 on:
   push:
@@ -32,21 +32,22 @@ jobs:
             set -ex
             cd /home/nick/project
             
-            minikube config set driver docker
-            minikube start --cpus=4 --memory=8192 --disk-size=20g
-            
-            eval $(minikube -p minikube docker-env)
+            # Сборка Docker образов
             docker build -t project-frontend:latest ./frontend
             docker build -t project-backend:latest ./backend
             
+            # Загрузка образов в Minikube
+            minikube image load project-frontend:latest
+            minikube image load project-backend:latest
+            
+            # Применение Kubernetes конфигурации
             kubectl apply -f kubernetes-deployment.yaml
             
+            # Рестарт деплоев для обновления
             kubectl rollout restart deployment/frontend
             kubectl rollout restart deployment/backend
             
-            kubectl rollout status deployment/frontend --timeout=5m
-            kubectl rollout status deployment/backend --timeout=5m
-            
-            kubectl get pods -o wide
-            minikube service list
+            # Ожидание завершения
+            kubectl rollout status deployment/frontend --timeout=3m
+            kubectl rollout status deployment/backend --timeout=3m
           EOF

@@ -281,7 +281,6 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:v${{ needs.test-and-notify.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:latest
           push: true
@@ -292,8 +291,6 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:v${{ needs.test-and-notify.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
-
