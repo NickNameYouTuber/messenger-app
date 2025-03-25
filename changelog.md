@@ -130,3 +130,8 @@
 - Bump version to 0.25.0 and update changelog
 - Develop (#62)
 
+## [0.28.0] - 25.03.2025 19:37:59
+
+- Update ci_cd.yml
+- Bump version to 0.27.0 and update changelog
+
