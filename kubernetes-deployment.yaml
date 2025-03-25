@@ -20,7 +20,7 @@ spec:
       containers:
       - name: backend
         image: project-backend:latest
-        imagePullPolicy: Always
+        imagePullPolicy: Never
         ports:
         - containerPort: 8000
         readinessProbe:
@@ -48,6 +48,7 @@ spec:
     - protocol: TCP
       port: 8000
       targetPort: 8000
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -71,7 +72,7 @@ spec:
       containers:
       - name: frontend
         image: project-frontend:latest
-        imagePullPolicy: Always
+        imagePullPolicy: Never
         ports:
         - containerPort: 80
         readinessProbe:
