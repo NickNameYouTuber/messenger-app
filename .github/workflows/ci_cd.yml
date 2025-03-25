@@ -11,12 +11,11 @@ jobs:
   create-pr:
     runs-on: ubuntu-latest
     outputs:
-      pr_number: ${{ steps.create-pr.outputs.pr_number }}
+      pr_number: ${{ steps.create-pr.outputs.result }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Создаем Pull Request в ветку develop
       - name: Create Pull Request to develop
         id: create-pr
         uses: actions/github-script@v6
@@ -47,11 +46,8 @@ jobs:
               pullNumber = pulls.data[0].number;
               console.log(`Pull Request already exists: #${pullNumber}`);
             }
-            // Устанавливаем номер PR как output
-            return pullNumber;
-        outputs:
-          pr_number: ${{ steps.create-pr.outputs.result }}
-
+            return pullNumber; 
+            
   test-and-notify:
     needs: create-pr
     runs-on: ubuntu-latest
