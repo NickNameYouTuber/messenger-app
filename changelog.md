@@ -116,3 +116,19 @@
 
 - Update ci_cd.yml
 - Bump version to 0.25.0 and update changelog
+## [0.27.0] - 25.03.2025 09:46:33
+
+- feature/test-labels add_test_file
+- feature_devops/29_add_labels update_ci_cd.yml
+- Update ci_cd.yml
+- Merge branch 'feature/docker_hub_test' into master
+- Update ci_cd.yml
+- Update deploy.yml (#65)
+- Update CitySearch.js
+- new
+- Develop (#64)
+- Bump version to 0.26.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.25.0 and update changelog
+- Develop (#62)
+
