@@ -131,3 +131,8 @@
 - Bump version to 0.25.0 and update changelog
 - Develop (#62)
 
+## [0.28.0] - 25.03.2025 16:40:33
+
+- feature/57_auto_create_pr update_ci_cd.yml
+- Bump version to 0.27.0 and update changelog
+
