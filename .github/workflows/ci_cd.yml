@@ -180,50 +180,69 @@ jobs:
     if: needs.test-and-notify.outputs.test_status == 'success'
     permissions:
       contents: write
-      actions: write
+      pull-requests: write  # Added explicit permission for PR operations
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Use PAT_TOKEN for checkout to ensure proper authentication
+          token: ${{ secrets.PAT_TOKEN }}
   
       - name: Setup Git
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          # Authenticate git with PAT_TOKEN
+          git config --global credential.helper 'cache --timeout=3600'
+          echo "https://${{ secrets.PAT_TOKEN }}:x-oauth-basic@github.com" | git credential approve
   
       - name: Merge Pull Request with Conflict Resolution
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          # Обновляем локальную копию и переходим на целевую ветку
+          # Ensure we're on the feature/hotfix branch
           git fetch origin
           git checkout ${{ github.ref_name }}
           git pull origin ${{ github.ref_name }} --ff-only
-      
-          # Сливаем изменения из develop, принимая их при конфликте
+  
+          # Fetch and merge develop, resolving conflicts with 'theirs' strategy
           git fetch origin develop
-          git merge origin/develop -X theirs -m "Auto-merge conflict resolution" || true
-      
-          # Пушим изменения с полным указанием refspec
+          git merge origin/develop -X theirs -m "Auto-merge conflict resolution with develop" || {
+            echo "Conflict detected, resolving with 'theirs' strategy"
+            git checkout --theirs .
+            git add .
+            git commit -m "Resolved merge conflicts automatically with 'theirs' strategy"
+          }
+  
+          # Push changes back to the branch using PAT_TOKEN
           git push origin HEAD:refs/heads/${{ github.ref_name }} --force-with-lease
-
+  
       - name: Merge Pull Request via API
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Use PAT_TOKEN instead of GITHUB_TOKEN
+          github-token: ${{ secrets.PAT_TOKEN }}
           script: |
             const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
             if (pullNumber) {
-              await github.rest.pulls.merge({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pullNumber,
-                merge_method: 'merge'
-              });
-              console.log(`Pull Request #${pullNumber} merged successfully.`);
+              try {
+                const response = await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: Number(pullNumber),
+                  merge_method: 'merge',
+                  commit_title: `Auto-merge PR #${pullNumber} into develop`,
+                  commit_message: 'Automated merge by CI/CD pipeline'
+                });
+                console.log(`Pull Request #${pullNumber} merged successfully: ${response.data.sha}`);
+              } catch (error) {
+                console.error(`Failed to merge PR #${pullNumber}: ${error.message}`);
+                process.exit(1);
+              }
             } else {
               console.log("No pull request number available to merge.");
+              process.exit(1);
             }
 
   sonar-analysis:
