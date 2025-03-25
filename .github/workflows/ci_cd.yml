@@ -5,38 +5,66 @@ on:
     branches:
       - 'feature/*'
       - 'hotfix/*'
+  workflow_dispatch: # Добавляем триггер для ручного или программного запуска
 
 jobs:
   create-pr:
     runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.create-pr.outputs.result }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Создаем Pull Request в ветку develop
       - name: Create Pull Request to develop
+        id: create-pr
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const branch = context.ref.replace('refs/heads/', '');
-            const response = await github.rest.pulls.create({
+            let pullNumber;
+            // Проверяем, существует ли уже открытый PR для этой ветки
+            let pulls = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Merge ${branch} into develop`,
-              head: branch,
-              base: 'develop',
-              body: 'Automatically created by CI/CD pipeline.',
+              state: 'open',
+              head: `${context.repo.owner}:${branch}`,
+              base: 'develop'
             });
-            console.log(`Pull Request created: #${response.data.number}`);
-            // Сохраняем номер PR для использования в других джобах
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'ci_cd.yml',
-              ref: branch,
-              inputs: { pr_number: response.data.number }
-            });
+            if (pulls.data.length === 0) {
+              try {
+                const response = await github.rest.pulls.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `Merge ${branch} into develop`,
+                  head: branch,
+                  base: 'develop',
+                  body: 'Automatically created by CI/CD pipeline.'
+                });
+                pullNumber = response.data.number;
+                console.log(`Pull Request created: #${pullNumber}`);
+              } catch (error) {
+                if (error.message.includes("A pull request already exists")) {
+                  // Если PR уже существует, получаем его номер
+                  pulls = await github.rest.pulls.list({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    state: 'open',
+                    head: `${context.repo.owner}:${branch}`,
+                    base: 'develop'
+                  });
+                  pullNumber = pulls.data[0].number;
+                  console.log(`Pull Request already exists: #${pullNumber}`);
+                } else {
+                  throw error;
+                }
+              }
+            } else {
+              pullNumber = pulls.data[0].number;
+              console.log(`Pull Request already exists: #${pullNumber}`);
+            }
+            return pullNumber;
 
   test-and-notify:
     needs: create-pr
@@ -75,15 +103,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const branch = context.ref.replace('refs/heads/', '');
-            const pulls = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: `${context.repo.owner}:${branch}`
-            });
-            if (pulls.data.length > 0) {
-              const pullNumber = pulls.data[0].number;
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
               await github.rest.issues.addLabels({
                 issue_number: pullNumber,
                 owner: context.repo.owner,
@@ -180,7 +201,7 @@ jobs:
       version: ${{ env.VERSION }}
 
   auto-merge:
-    needs: test-and-notify
+    needs: [create-pr, test-and-notify]
     runs-on: ubuntu-latest
     if: needs.test-and-notify.outputs.test_status == 'success'
     steps:
@@ -193,16 +214,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const branch = context.ref.replace('refs/heads/', '');
-            const pulls = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: `${context.repo.owner}:${branch}`,
-              base: 'develop'
-            });
-            if (pulls.data.length > 0) {
-              const pullNumber = pulls.data[0].number;
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
               await github.rest.pulls.merge({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -211,7 +224,7 @@ jobs:
               });
               console.log(`Pull Request #${pullNumber} merged successfully.`);
             } else {
-              console.log("No open pull request found to merge.");
+              console.log("No pull request number available to merge.");
             }
 
   sonar-analysis:
