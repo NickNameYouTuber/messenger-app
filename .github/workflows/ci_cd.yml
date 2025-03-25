@@ -13,6 +13,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Read version from file
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(cat version/version)
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "::set-output name=version::${VERSION}"
+
       # Настройка и тестирование фронтенда
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -104,10 +112,10 @@ jobs:
           BACKEND_STATUS="${{ steps.backend-tests.outcome }}"
           
           if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
-            echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}" >> $GITHUB_ENV
+            echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}" >> $GITHUB_ENV
             echo "STATUS=success" >> $GITHUB_ENV
           else
-            echo "MESSAGE=❌ Some tests failed!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AFrontend: $FRONTEND_STATUS%0ABackend: $BACKEND_STATUS" >> $GITHUB_ENV
+            echo "MESSAGE=❌ Some tests failed!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}%0AFrontend: $FRONTEND_STATUS%0ABackend: $BACKEND_STATUS" >> $GITHUB_ENV
             echo "STATUS=failure" >> $GITHUB_ENV
           fi
         shell: bash
@@ -135,7 +143,7 @@ jobs:
           password: ${{ secrets.SMTP_PASSWORD }}
           from: ${{ secrets.SMTP_USER }}
           to: ${{ secrets.EMAIL_RECIPIENT }}
-          subject: Test Results - ${{ github.ref_name }}
+          subject: Test Results - ${{ github.ref_name }} (v${{ env.VERSION }})
           body: |
             The test results are as follows:
             ${{ env.MESSAGE }}
@@ -143,6 +151,7 @@ jobs:
 
     outputs:
       test_status: ${{ env.STATUS }}
+      version: ${{ env.VERSION }}
 
   sonar-analysis:
     needs: test-and-notify
@@ -182,6 +191,7 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:${{ needs.test-and-notify.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:latest
           push: true
@@ -192,6 +202,7 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:${{ needs.test-and-notify.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
