@@ -140,3 +140,8 @@
 - Update App.test.js
 - Bump version to 0.28.0 and update changelog
 
+## [0.30.0] - 25.03.2025 19:51:28
+
+- Update App.test.js
+- Bump version to 0.29.0 and update changelog
+
