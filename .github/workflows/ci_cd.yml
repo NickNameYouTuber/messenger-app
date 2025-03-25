@@ -175,7 +175,7 @@ jobs:
       version: ${{ env.VERSION }}
 
   auto-merge:
-    needs: [create-pr, test-and-notify]
+    needs: [create-pr, test-and-notify, sonar-analysis]
     runs-on: ubuntu-latest
     if: needs.test-and-notify.outputs.test_status == 'success'
     steps:
@@ -196,6 +196,7 @@ jobs:
           git fetch origin develop
           git checkout ${{ github.ref_name }}
           git merge -X theirs origin/develop
+          git pull origin ${{ github.ref_name }} --rebase
           git push origin ${{ github.ref_name }}
 
       - name: Merge Pull Request
