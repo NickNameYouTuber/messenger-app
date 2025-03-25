@@ -132,3 +132,10 @@
 - Bump version to 0.25.0 and update changelog
 - Develop (#62)
 
+## [0.28.0] - 25.03.2025 10:14:39
+
+- feature/test-labels add_test_labels
+- Merge branch 'feature/test-labels' of https://github.com/NickNameYouTuber/messenger-app into feature/test-labels
+- feature/test-labels add_test_file
+- Bump version to 0.27.0 and update changelog
+
