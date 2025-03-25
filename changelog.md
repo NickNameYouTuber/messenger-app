@@ -97,20 +97,13 @@
 - Update deploy.yml
 - Update deploy.yml
 - Feature/test workflows (#49) (#54)
-
-
 - Merge branch 'feature/k8s' of https://github.com/NickNameYouTuber/messenger-app into feature/k8s
 - add k8s in deploy
 - Bump version to 0.24.0 and update changelog
 
+## [0.25.0] - 24.03.2025 20:06:54
 
-## [0.26.0] - 24.03.2025 20:18:32
-
-- Merge branch 'develop' into feature/k8s
-- Bump version to 0.25.0 and update changelog
-- Update ci_cd.yml
-- Merge branch 'master' into develop
-- Feature/k8s (#61)
+- Develop (#62)
 - Update CitySearch.js (#60)
 - Update deploy.yml (#59)
 - Update deploy.yml
@@ -119,3 +112,7 @@
 - Update nginx.conf
 - Merge pull request #56 from NickNameYouTuber/develop
 
+## [0.26.0] - 24.03.2025 20:08:04
+
+- Update ci_cd.yml
+- Bump version to 0.25.0 and update changelog
