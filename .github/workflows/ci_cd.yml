@@ -25,7 +25,7 @@ jobs:
         run: |
           VERSION=$(cat version/version)
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "::set-output name=version::${VERSION}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT # Исправленный формат
 
       # Настройка и тестирование фронтенда
       - name: Setup Node.js
@@ -129,20 +129,9 @@ jobs:
             The test results are as follows:
             ${{ env.MESSAGE }}
           secure: true
-
-  status:
-    needs: test-and-notify
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Check test results
-        run: |
-          if [ "${{ needs.test-and-notify.outputs.test_status }}" != "success" ]; then
-            exit 1
-          fi      
     outputs:
-      test_status: ${{ env.STATUS }}
-      version: ${{ env.VERSION }}
+      test_status: ${{ steps.test-status.outputs.test_status }}
+      version: ${{ steps.version.outputs.version }}
 
   # ======================
   # 2. АНАЛИЗ КОДА
