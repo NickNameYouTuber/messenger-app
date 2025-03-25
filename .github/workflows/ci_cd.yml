@@ -104,6 +104,31 @@ jobs:
         working-directory: ./backend
         continue-on-error: true
 
+      - name: Add label "backend-test-passed"
+        if: steps.backend-tests.outcome == 'success'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const pulls = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${branch}`
+            });
+            if (pulls.data.length > 0) {
+              const pullNumber = pulls.data[0].number;
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["backend-test-passed"]
+              });
+            } else {
+              console.log("No open pull request found for branch:", branch);
+            }
+
       # Определяем общий статус тестирования и формируем итоговое сообщение
       - name: Determine test status
         id: test-status
@@ -169,6 +194,31 @@ jobs:
             exit 1
           fi
 
+      - name: Add label "sec-passed"
+        if: needs.test-and-notify.outputs.test_status == 'success'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const pulls = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${branch}`
+            });
+            if (pulls.data.length > 0) {
+              const pullNumber = pulls.data[0].number;
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["sec-passed"]
+              });
+            } else {
+              console.log("No open pull request found for branch:", branch);
+            }
+
   docker-push:
     needs: test-and-notify
     permissions:
@@ -206,3 +256,27 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
+
+      - name: Add label "PROD"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const pulls = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${branch}`
+            });
+            if (pulls.data.length > 0) {
+              const pullNumber = pulls.data[0].number;
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["PROD"]
+              });
+            } else {
+              console.log("No open pull request found for branch:", branch);
+            }
