@@ -7,7 +7,39 @@ on:
       - 'hotfix/*'
 
 jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Создаем Pull Request в ветку develop
+      - name: Create Pull Request to develop
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const response = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Merge ${branch} into develop`,
+              head: branch,
+              base: 'develop',
+              body: 'Automatically created by CI/CD pipeline.',
+            });
+            console.log(`Pull Request created: #${response.data.number}`);
+            // Сохраняем номер PR для использования в других джобах
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci_cd.yml',
+              ref: branch,
+              inputs: { pr_number: response.data.number }
+            });
+
   test-and-notify:
+    needs: create-pr
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -31,7 +63,6 @@ jobs:
         run: npm install
         working-directory: ./frontend
 
-      # Запускаем Jest с выводом отчёта в JSON
       - name: Run Jest tests
         id: frontend-tests
         run: npx jest --json --outputFile=jest-results.json --verbose
@@ -59,11 +90,9 @@ jobs:
                 repo: context.repo.repo,
                 labels: ["test-passed"]
               });
-            } else {
-              console.log("No open pull request found for branch:", branch);
             }
 
-      # Отправляем отдельное уведомление в Telegram для каждого теста
+      # Отправляем уведомления в Telegram для каждого теста
       - name: Send individual Telegram notifications for frontend tests
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -80,8 +109,6 @@ jobs:
                 -d text="$(echo -e "$MESSAGE")" \
                 -d parse_mode="HTML"
             done
-          else
-            echo "jest-results.json not found."
           fi
         working-directory: ./frontend
         shell: bash
@@ -104,13 +131,12 @@ jobs:
         working-directory: ./backend
         continue-on-error: true
 
-      # Определяем общий статус тестирования и формируем итоговое сообщение
+      # Определяем общий статус тестирования
       - name: Determine test status
         id: test-status
         run: |
           FRONTEND_STATUS="${{ steps.frontend-tests.outcome }}"
           BACKEND_STATUS="${{ steps.backend-tests.outcome }}"
-          
           if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
             echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}" >> $GITHUB_ENV
             echo "STATUS=success" >> $GITHUB_ENV
@@ -133,7 +159,7 @@ jobs:
             -d parse_mode="HTML"
         shell: bash
 
-      # Отправляем итоговое уведомление по электронной почте
+      # Отправляем итоговое уведомление по email
       - name: Send email with test results
         uses: dawidd6/action-send-mail@v3
         with:
@@ -152,6 +178,41 @@ jobs:
     outputs:
       test_status: ${{ env.STATUS }}
       version: ${{ env.VERSION }}
+
+  auto-merge:
+    needs: test-and-notify
+    runs-on: ubuntu-latest
+    if: needs.test-and-notify.outputs.test_status == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Автоматический мердж PR в develop
+      - name: Merge Pull Request
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const pulls = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${branch}`,
+              base: 'develop'
+            });
+            if (pulls.data.length > 0) {
+              const pullNumber = pulls.data[0].number;
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullNumber,
+                merge_method: 'merge'
+              });
+              console.log(`Pull Request #${pullNumber} merged successfully.`);
+            } else {
+              console.log("No open pull request found to merge.");
+            }
 
   sonar-analysis:
     needs: test-and-notify
