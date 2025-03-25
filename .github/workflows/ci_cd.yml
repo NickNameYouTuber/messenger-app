@@ -193,13 +193,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Получаем последние изменения из develop
           git fetch origin develop
+          # Переходим на текущую ветку (например, feature/cicd_pr)
           git checkout ${{ github.ref_name }}
-          # Выполняем слияние с опцией, которая принимает изменения из develop при конфликте
+          # Сливаем изменения из develop, предпочитая их при конфликте
           git merge origin/develop -X theirs -m "Auto-merge conflict resolution"
-          git push origin ${{ github.ref_name }}
+          # Обновляем локальную ветку, интегрируя возможные удалённые изменения
+          git pull origin ${{ github.ref_name }} --rebase || true
+          # Пушим изменения с опцией force-with-lease, чтобы обновить удалённую ветку
+          git push origin ${{ github.ref_name }} --force-with-lease
 
-      - name: Merge Pull Request
+      - name: Merge Pull Request via API
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
