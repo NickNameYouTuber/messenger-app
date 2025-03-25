@@ -193,17 +193,20 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
   
       - name: Merge Pull Request with Conflict Resolution
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Получаем последние изменения из develop
-          git fetch origin develop
-          git checkout ${{ github.ref_name }}
-          # Сливаем изменения из develop, предпочитая их при конфликте
-          git merge origin/develop -X theirs -m "Auto-merge conflict resolution"
-          # Пушим изменения с опцией force-with-lease
-          git push origin ${{ github.ref_name }} --force-with-lease
-  
+          env:
+            GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          run: |
+            # Получаем последние изменения из develop и целевой ветки
+            git fetch origin develop
+            git fetch origin ${{ github.ref_name }}
+            git checkout ${{ github.ref_name }}
+            # Сливаем изменения из develop, предпочитая их при конфликте
+            git merge origin/develop -X theirs -m "Auto-merge conflict resolution"
+            # Обновляем локальную ветку, ребейзясь на последний коммит удалённой ветки
+            git rebase origin/${{ github.ref_name }} || true
+            # Пушим изменения принудительно
+            git push origin HEAD --force
+
       - name: Merge Pull Request via API
         uses: actions/github-script@v6
         with:
