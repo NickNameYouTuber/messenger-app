@@ -178,32 +178,32 @@ jobs:
     needs: [create-pr, test-and-notify, sonar-analysis]
     runs-on: ubuntu-latest
     if: needs.test-and-notify.outputs.test_status == 'success'
+    permissions:
+      contents: write
+      actions: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+  
       - name: Setup Git
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-
+  
       - name: Merge Pull Request with Conflict Resolution
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Получаем последние изменения из develop
           git fetch origin develop
-          # Переходим на текущую ветку (например, feature/cicd_pr)
           git checkout ${{ github.ref_name }}
           # Сливаем изменения из develop, предпочитая их при конфликте
           git merge origin/develop -X theirs -m "Auto-merge conflict resolution"
-          # Обновляем локальную ветку, интегрируя возможные удалённые изменения
-          git pull origin ${{ github.ref_name }} --rebase || true
-          # Пушим изменения с опцией force-with-lease, чтобы обновить удалённую ветку
+          # Пушим изменения с опцией force-with-lease
           git push origin ${{ github.ref_name }} --force-with-lease
-
+  
       - name: Merge Pull Request via API
         uses: actions/github-script@v6
         with:
