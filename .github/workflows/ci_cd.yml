@@ -195,8 +195,8 @@ jobs:
         run: |
           git fetch origin develop
           git checkout ${{ github.ref_name }}
-          git merge -X theirs origin/develop
-          git pull origin ${{ github.ref_name }} --rebase
+          # Выполняем слияние с опцией, которая принимает изменения из develop при конфликте
+          git merge origin/develop -X theirs -m "Auto-merge conflict resolution"
           git push origin ${{ github.ref_name }}
 
       - name: Merge Pull Request
@@ -270,4 +270,3 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
-
