@@ -236,3 +236,55 @@
 - Update nginx.conf
 - Merge pull request #56 from NickNameYouTuber/develop
 
+## [0.27.0] - 25.03.2025 20:54:59
+
+- Auto-merge conflict resolution with develop
+- Bump version to 0.44.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.43.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.42.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.41.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.40.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.39.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.38.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.37.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.36.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.35.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.34.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.33.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.32.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.31.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.30.0 and update changelog
+- Update App.test.js
+- Bump version to 0.29.0 and update changelog
+- Update App.test.js
+- Bump version to 0.28.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.27.0 and update changelog
+- Update ci_cd.yml
+- Merge branch 'feature/docker_hub_test' into master
+- Update ci_cd.yml
+- Update deploy.yml (#65)
+- Update CitySearch.js
+- new
+- Develop (#64)
+- Merge branch 'master' into develop
+- Feature/k8s (#63)
+- Bump version to 0.26.0 and update changelog
+- Update ci_cd.yml
+- Bump version to 0.25.0 and update changelog
+- Develop (#62)
+
