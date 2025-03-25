@@ -73,7 +73,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Read version from file
+      # Чтение версии из файла
       - name: Get version
         id: version
         run: |
@@ -97,7 +97,7 @@ jobs:
         working-directory: ./frontend
         continue-on-error: true
 
-      # Label | test-passed
+      # Добавление метки "test-passed"
       - name: Add label "test-passed"
         uses: actions/github-script@v6
         with:
@@ -113,7 +113,7 @@ jobs:
               });
             }
 
-      # Отправляем уведомления в Telegram для каждого теста
+      # Отправка уведомлений в Telegram по каждому тесту
       - name: Send individual Telegram notifications for frontend tests
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -152,7 +152,7 @@ jobs:
         working-directory: ./backend
         continue-on-error: true
 
-      # Определяем общий статус тестирования
+      # Определение общего статуса тестирования
       - name: Determine test status
         id: test-status
         run: |
@@ -167,7 +167,7 @@ jobs:
           fi
         shell: bash
 
-      # Отправляем итоговое уведомление в Telegram
+      # Итоговое уведомление в Telegram
       - name: Send Telegram final notification
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -180,7 +180,7 @@ jobs:
             -d parse_mode="HTML"
         shell: bash
 
-      # Отправляем итоговое уведомление по email
+      # Отправка итогового уведомления по email
       - name: Send email with test results
         uses: dawidd6/action-send-mail@v3
         with:
@@ -201,14 +201,14 @@ jobs:
       version: ${{ env.VERSION }}
 
   auto-merge:
-    needs: [create-pr, test-and-notify]
+    needs: [create-pr, test-and-notify, sonar-analysis]
     runs-on: ubuntu-latest
     if: needs.test-and-notify.outputs.test_status == 'success'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Автоматический мердж PR в develop
+      # Автоматический мердж PR в develop с проверкой mergeable
       - name: Merge Pull Request
         uses: actions/github-script@v6
         with:
@@ -216,13 +216,23 @@ jobs:
           script: |
             const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
             if (pullNumber) {
-              await github.rest.pulls.merge({
+              // Получаем данные PR, чтобы проверить, можно ли его смержить
+              const { data: pr } = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: pullNumber,
-                merge_method: 'merge'
               });
-              console.log(`Pull Request #${pullNumber} merged successfully.`);
+              if (pr.mergeable) {
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                  merge_method: 'merge'
+                });
+                console.log(`Pull Request #${pullNumber} merged successfully.`);
+              } else {
+                console.log(`Pull Request #${pullNumber} is not mergeable.`);
+              }
             } else {
               console.log("No pull request number available to merge.");
             }
