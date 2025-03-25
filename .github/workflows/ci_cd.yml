@@ -1,12 +1,18 @@
-name: Test and Notify
+name: Test and Notify and Auto-Merge
 
 on:
   push:
     branches:
       - 'feature/*'
       - 'hotfix/*'
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
+  # =============================================
+  # БЛОК ТЕСТИРОВАНИЯ
+  # =============================================
   test-and-notify:
     runs-on: ubuntu-latest
     steps:
@@ -37,31 +43,6 @@ jobs:
         run: npx jest --json --outputFile=jest-results.json --verbose
         working-directory: ./frontend
         continue-on-error: true
-
-      # Label | test-passed
-      - name: Add label "test-passed"
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const branch = context.ref.replace('refs/heads/', '');
-            const pulls = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: `${context.repo.owner}:${branch}`
-            });
-            if (pulls.data.length > 0) {
-              const pullNumber = pulls.data[0].number;
-              await github.rest.issues.addLabels({
-                issue_number: pullNumber,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                labels: ["test-passed"]
-              });
-            } else {
-              console.log("No open pull request found for branch:", branch);
-            }
 
       # Отправляем отдельное уведомление в Telegram для каждого теста
       - name: Send individual Telegram notifications for frontend tests
@@ -158,6 +139,7 @@ jobs:
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
 
+  #Куда девать этот блок?
   status:
     needs: test-and-notify
     runs-on: ubuntu-latest
@@ -206,3 +188,26 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
+
+  # =============================================
+  # БЛОК СОЗДАНИЯ PULL REQUEST (новый функционал)
+  # =============================================
+
+  create-pr:
+    needs: test # Зависит от успешного тестирования
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Автоматическое создание PR с помощью популярного action
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "Auto PR: ${{ github.ref_name }}" # Название PR
+          body: "Automated PR from ${{ github.ref_name }}" # Описание
+          base: develop # Целевая ветка (куда мержим)
+          branch: "auto-pr/${{ github.ref_name }}" # Временная ветка
+          delete-branch: true # Автоудаление временной ветки
+          commit-message: "Automatic changes from ${{ github.ref_name }}"
