@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   # =============================================
-  # БЛОК ТЕСТИРОВАНИЯ
+  # 1. БЛОК ТЕСТИРОВАНИЯ
   # =============================================
   test-and-notify:
     runs-on: ubuntu-latest
@@ -130,16 +130,6 @@ jobs:
             ${{ env.MESSAGE }}
           secure: true
 
-    outputs:
-      test_status: ${{ env.STATUS }}
-      version: ${{ env.VERSION }}
-
-  sonar-analysis:
-    needs: test-and-notify
-    uses: ./.github/workflows/sonar-analysis.yml
-    secrets: inherit
-
-  #Куда девать этот блок?
   status:
     needs: test-and-notify
     runs-on: ubuntu-latest
@@ -149,8 +139,22 @@ jobs:
         run: |
           if [ "${{ needs.test-and-notify.outputs.test_status }}" != "success" ]; then
             exit 1
-          fi
+          fi      
+    outputs:
+      test_status: ${{ env.STATUS }}
+      version: ${{ env.VERSION }}
 
+  # ======================
+  # 2. АНАЛИЗ КОДА
+  # ======================
+  sonar-analysis:
+    needs: test-and-notify
+    uses: ./.github/workflows/sonar-analysis.yml
+    secrets: inherit
+
+  # ======================
+  # 3. СБОРКА ОБРАЗОВ
+  # ======================
   docker-push:
     needs: test-and-notify
     permissions:
@@ -189,14 +193,13 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
 
-  # =============================================
-  # БЛОК СОЗДАНИЯ PULL REQUEST (новый функционал)
-  # =============================================
-
+  # ======================
+  # 4. РАБОТА С PR
+  # ======================
   create-pr:
-    needs: test # Зависит от успешного тестирования
+    needs: [test-and-notify, sonar-analysis, docker-push]
+    if: needs.test-and-notify.outputs.test_status == 'success'
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
