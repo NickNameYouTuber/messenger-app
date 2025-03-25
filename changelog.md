@@ -135,3 +135,8 @@
 - Update ci_cd.yml
 - Bump version to 0.27.0 and update changelog
 
+## [0.29.0] - 25.03.2025 19:48:17
+
+- Update App.test.js
+- Bump version to 0.28.0 and update changelog
+
