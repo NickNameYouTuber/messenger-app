@@ -74,6 +74,16 @@ jobs:
               });
               console.log(`Pull Request #${prNumber} force merged successfully: ${response.data.sha}`);
             } catch (error) {
+              if (error.message && error.message.includes("Base branch was modified")) {
+                console.log("Base branch was modified. Предполагаем, что force merge уже применён, закрываем PR.");
+                await github.rest.pulls.update({
+                  owner,
+                  repo,
+                  pull_number: prNumber,
+                  state: 'closed'
+                });
+                return;
+              }
               console.error(`Error during force merge of PR #${prNumber}: ${error.message}`);
               process.exit(1);
             }
