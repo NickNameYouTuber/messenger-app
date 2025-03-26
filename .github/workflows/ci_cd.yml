@@ -210,12 +210,12 @@ jobs:
     secrets: inherit
 
   versioning:
-    needs: [auto-merge]
     if: |
-      (github.event.pull_request.merged == true || 
-      github.event_name == 'workflow_dispatch') &&
-      needs.auto-merge.result == 'success'
-    runs-on: ubuntu-latest
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'develop'
+    runs-on: ubuntu-latest      
     outputs:
       version: ${{ steps.set-version.outputs.version }}
     steps:
