@@ -60,41 +60,20 @@ jobs:
             -d text="$MESSAGE" \
             -d parse_mode="HTML"
 
-  test-and-notify:
+  frontend-tests:
     needs: create-pr
     runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.test-status.outputs.status }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Get version
-        id: version
-        run: |
-          VERSION=$(cat version/version)
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "::set-output name=version::${VERSION}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '16'
-          
-      - name: Add build version label
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
-            const version = "${{ env.VERSION }}".replace(/\./g, '-');
-            if (pullNumber && version) {
-              await github.rest.issues.addLabels({
-                issue_number: pullNumber,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                labels: [`build-v${version}`]
-              });
-            }
-            
+
       - name: Install frontend dependencies
         run: npm install
         working-directory: ./frontend
@@ -105,21 +84,6 @@ jobs:
         working-directory: ./frontend
         continue-on-error: true
 
-      - name: Add label "test-passed"
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
-            if (pullNumber) {
-              await github.rest.issues.addLabels({
-                issue_number: pullNumber,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                labels: ["test-passed"]
-              });
-            }
-
       - name: Send individual Telegram notifications for frontend tests
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -129,7 +93,7 @@ jobs:
             cat jest-results.json | jq -c '.testResults[].assertionResults[]' | while read -r test; do
               TEST_NAME=$(echo "$test" | jq -r '.fullName')
               TEST_STATUS=$(echo "$test" | jq -r '.status')
-              MESSAGE="GITHUB_DEVOPS_BOT%0ATest: $TEST_NAME%0AStatus: $TEST_STATUS"
+              MESSAGE="GITHUB_DEVOPS_BOT%0ATest Frontend: $TEST_NAME%0AStatus: $TEST_STATUS"
               curl -s -X POST \
                 https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
                 -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -139,6 +103,20 @@ jobs:
           fi
         working-directory: ./frontend
         shell: bash
+
+      - name: Set test status
+        id: test-status
+        run: |
+          echo "status=${{ steps.frontend-tests.outcome }}" >> $GITHUB_OUTPUT
+
+  backend-tests:
+    needs: create-pr
+    runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.test-status.outputs.status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -157,11 +135,75 @@ jobs:
         working-directory: ./backend
         continue-on-error: true
 
+      - name: Send Telegram notification - Backend Tests
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          STATUS="${{ steps.backend-tests.outcome }}"
+          MESSAGE="GITHUB_DEVOPS_BOT%0ABackend Tests Completed%0AStatus: $STATUS"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
+        shell: bash
+
+      - name: Set test status
+        id: test-status
+        run: |
+          echo "status=${{ steps.backend-tests.outcome }}" >> $GITHUB_OUTPUT
+
+  test-notify:
+    needs: [create-pr, frontend-tests, backend-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(cat version/version)
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Add build version label
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            const version = "${{ env.VERSION }}".replace(/\./g, '-');
+            if (pullNumber && version) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: [`build-v${version}`]
+              });
+            }
+
+      - name: Add label "test-passed"
+        if: ${{ needs.frontend-tests.outputs.test_status == 'success' && needs.backend-tests.outputs.test_status == 'success' }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["test-passed"]
+              });
+            }
+
       - name: Determine test status
         id: test-status
         run: |
-          FRONTEND_STATUS="${{ steps.frontend-tests.outcome }}"
-          BACKEND_STATUS="${{ steps.backend-tests.outcome }}"
+          FRONTEND_STATUS="${{ needs.frontend-tests.outputs.test_status }}"
+          BACKEND_STATUS="${{ needs.backend-tests.outputs.test_status }}"
           if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
             echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}" >> $GITHUB_ENV
             echo "STATUS=success" >> $GITHUB_ENV
@@ -171,7 +213,7 @@ jobs:
           fi
         shell: bash
 
-      - name: Send Telegram final notification
+      - name: Send Telegram notification - Test Summary
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -203,9 +245,9 @@ jobs:
       version: ${{ env.VERSION }}
 
   auto-merge:
-    needs: [create-pr, test-and-notify, sonar-analysis]
+    needs: [create-pr, test-notify, sonar-analysis]
     runs-on: ubuntu-latest
-    if: needs.test-and-notify.outputs.test_status == 'success'
+    if: needs.test-notify.outputs.test_status == 'success'
     permissions:
       contents: write
       pull-requests: write
@@ -301,23 +343,23 @@ jobs:
             }
 
   sonar-analysis:
-    needs: test-and-notify
+    needs: test-notify
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
 
   status:
-    needs: test-and-notify
+    needs: test-notify
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check test results
         run: |
-          if [ "${{ needs.test-and-notify.outputs.test_status }}" != "success" ]; then
+          if [ "${{ needs.test-notify.outputs.test_status }}" != "success" ]; then
             exit 1
           fi
 
   docker-push:
-    needs: test-and-notify
+    needs: test-notify
     permissions:
       contents: read
       packages: write
@@ -357,7 +399,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          MESSAGE="GITHUB_DEVOPS_BOT%0A Docker образы успешно загружены%0AВерсия: ${{ needs.test-and-notify.outputs.version }}%0AПроект: ${{ github.repository }}"
+          MESSAGE="GITHUB_DEVOPS_BOT%0A Docker образы успешно загружены%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AПроект: ${{ github.repository }}"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -370,7 +412,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           CHANGELOG=$(cat changelog.md | sed 's/%/%25/g; s/\n/%0A/g; s/\r//g')
-          MESSAGE="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: ${{ github.repository }}%0AВерсия: ${{ needs.test-and-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-and-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: ${{ secrets.DOCKER_HUB_USERNAME }}%0AНазвание: messenger%0AТег: ${{ needs.test-and-notify.outputs.version }}%0AПолное имя: ${{ secrets.DOCKER_HUB_USERNAME }}/messenger:v${{ needs.test-and-notify.outputs.version }}%0A%0AChangelog:%0A${CHANGELOG}"
+          MESSAGE="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: land_devops%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: makarmarkov%0AНазвание: land_devops%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: makarmarkov/land_devops:v${{ needs.test-notify.outputs.version }}%0A%0A${CHANGELOG}"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
