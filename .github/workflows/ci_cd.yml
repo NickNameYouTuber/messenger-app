@@ -436,8 +436,8 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Основное сообщение
-          MESSAGE="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: land_devops%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: makarmarkov%0AНазвание: land_devops%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: makarmarkov/land_devops:v${{ needs.test-notify.outputs.version }}"
+          # Основное сообщение с дополнительными ссылками
+          MESSAGE="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: land_devops%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: makarmarkov%0AНазвание: land_devops%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: makarmarkov/land_devops:v${{ needs.test-notify.outputs.version }}%0A%0AСсылка на Докер Хаб: https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend%0AСсылка на пайплайн: ${{ github.run_url }}"
           
           # Отправка основного сообщения как текст
           curl -s -X POST \
