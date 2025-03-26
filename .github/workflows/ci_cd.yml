@@ -138,7 +138,7 @@ jobs:
       - name: Send Telegram notification - Backend Tests
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           STATUS="${{ steps.backend-tests.outcome }}"
           MESSAGE="GITHUB_DEVOPS_BOT%0ABackend Tests Completed%0AStatus: $STATUS"
