@@ -48,6 +48,18 @@ jobs:
             }
             return pullNumber;
 
+      - name: Send Telegram notification - PR Created
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MESSAGE="GITHUB_DEVOPS_BOT%0AСоздан новый PR #%{{ steps.create-pr.outputs.result }}%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
+
   test-and-notify:
     needs: create-pr
     runs-on: ubuntu-latest
@@ -73,7 +85,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
-            const version = "${{ env.VERSION }}".replace(/\./g, '-'); // Заменяем точки на дефисы
+            const version = "${{ env.VERSION }}".replace(/\./g, '-');
             if (pullNumber && version) {
               await github.rest.issues.addLabels({
                 issue_number: pullNumber,
@@ -117,7 +129,7 @@ jobs:
             cat jest-results.json | jq -c '.testResults[].assertionResults[]' | while read -r test; do
               TEST_NAME=$(echo "$test" | jq -r '.fullName')
               TEST_STATUS=$(echo "$test" | jq -r '.status')
-              MESSAGE="Test: $TEST_NAME\nStatus: $TEST_STATUS"
+              MESSAGE="GITHUB_DEVOPS_BOT%0ATest: $TEST_NAME%0AStatus: $TEST_STATUS"
               curl -s -X POST \
                 https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
                 -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -164,12 +176,12 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          MESSAGE="GITHUB_DEVOPS_BOT%0A${MESSAGE}%0AТекущий этап: Завершение тестов"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
             -d text="$MESSAGE" \
             -d parse_mode="HTML"
-        shell: bash
 
       - name: Send email with test results
         uses: dawidd6/action-send-mail@v3
@@ -213,33 +225,18 @@ jobs:
         env:
           PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          # Set the remote URL with PAT_TOKEN for authentication
           git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
-  
-          # Fetch all branches
           git fetch origin
-  
-          # Checkout the feature branch
           git checkout ${{ github.ref_name }}
-  
-          # Pull latest changes from the feature branch
           git pull origin ${{ github.ref_name }} --ff-only
-  
-          # Checkout develop branch
           git checkout develop
-  
-          # Pull latest develop to ensure we're up-to-date
           git pull origin develop --ff-only
-  
-          # Force merge the feature branch into develop, overwriting conflicts with feature branch changes
           git merge ${{ github.ref_name }} -X ours --allow-unrelated-histories -m "Force merge ${{ github.ref_name }} into develop" || {
             echo "Conflicts detected, forcing feature branch changes over develop"
             git checkout --ours .
             git add .
             git commit -m "Force resolved conflicts in favor of ${{ github.ref_name }}"
           }
-  
-          # Force push the updated develop branch
           git push origin develop --force
   
       - name: Update and Merge Pull Request via API with Force
@@ -252,35 +249,41 @@ jobs:
               console.log("No pull request number available to merge.");
               process.exit(1);
             }
-  
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const prNumber = Number(pullNumber);
-  
-            // Check PR state for logging purposes
             const { data: pr } = await github.rest.pulls.get({
               owner,
               repo,
               pull_number: prNumber
             });
             console.log(`PR #${prNumber} mergeable state: ${pr.mergeable_state}`);
-  
-            // Force merge the PR into develop, overwriting base branch if needed
             try {
               const response = await github.rest.pulls.merge({
                 owner,
                 repo,
                 pull_number: prNumber,
-                merge_method: 'merge', // Could use 'rebase' or 'squash' if preferred
+                merge_method: 'merge',
                 commit_title: `Force merge PR #${prNumber} into develop`,
                 commit_message: 'Force merged by CI/CD pipeline, overwriting develop with feature branch changes'
               });
               console.log(`Pull Request #${prNumber} force merged successfully: ${response.data.sha}`);
             } catch (error) {
               console.error(`Failed to force merge PR #${prNumber}: ${error.message}`);
-              // If API merge fails (e.g., due to branch protection), log and proceed since local force push already updated develop
               console.log("Falling back to local force push result.");
             }
+
+      - name: Send Telegram notification - Merge Completed
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MESSAGE="GITHUB_DEVOPS_BOT%0APR #${{ needs.create-pr.outputs.pr_number }} успешно смержен%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
 
       - name: Add label "PROD"
         uses: actions/github-script@v6
@@ -348,7 +351,32 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
-          
+
+      - name: Send Telegram notification - Docker Push Completed
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MESSAGE="GITHUB_DEVOPS_BOT%0A Docker образы успешно загружены%0AВерсия: ${{ needs.test-and-notify.outputs.version }}%0AПроект: ${{ github.repository }}"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
+
+      - name: Send Final Telegram Report
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          CHANGELOG=$(cat changelog.md | sed 's/%/%25/g; s/\n/%0A/g; s/\r//g')
+          MESSAGE="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: ${{ github.repository }}%0AВерсия: ${{ needs.test-and-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-and-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: ${{ secrets.DOCKER_HUB_USERNAME }}%0AНазвание: messenger%0AТег: ${{ needs.test-and-notify.outputs.version }}%0AПолное имя: ${{ secrets.DOCKER_HUB_USERNAME }}/messenger:v${{ needs.test-and-notify.outputs.version }}%0A%0AChangelog:%0A${CHANGELOG}"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
+
       - name: Add label "dockerhub"
         if: success()
         uses: actions/github-script@v6
