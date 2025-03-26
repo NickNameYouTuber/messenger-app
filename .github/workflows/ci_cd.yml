@@ -463,12 +463,3 @@ jobs:
               -d parse_mode="HTML" || echo "Failed to send changelog not found message"
           fi
         shell: bash
-            # Отправка сообщения об отсутствии changelog
-            MESSAGE="GITHUB_DEVOPS_BOT%0AChangelog not found"
-            curl -s -X POST \
-              https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-              -d chat_id=${TELEGRAM_CHAT_ID} \
-              -d text="$MESSAGE" \
-              -d parse_mode="HTML" || echo "Failed to send changelog not found message"
-          fi
-        shell: bash
