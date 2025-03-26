@@ -5,7 +5,7 @@ on:
     branches:
       - 'feature/*'
       - 'hotfix/*'
-  workflow_dispatch: # Добавляем триггер для ручного или программного запуска
+  workflow_dispatch:
 
 jobs:
   create-pr:
@@ -46,24 +46,29 @@ jobs:
               pullNumber = pulls.data[0].number;
               console.log(`Pull Request already exists: #${pullNumber}`);
             }
-            return pullNumber; 
-            
-  test-and-notify:
+            return pullNumber;
+
+      - name: Send Telegram notification - PR Created
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MESSAGE="GITHUB_DEVOPS_BOT%0AСоздан новый PR #%{{ steps.create-pr.outputs.result }}%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
+
+  frontend-tests:
     needs: create-pr
     runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.test-status.outputs.status }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Read version from file
-      - name: Get version
-        id: version
-        run: |
-          VERSION=$(cat version/version)
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "::set-output name=version::${VERSION}"
-
-      # Настройка и тестирование фронтенда
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -79,23 +84,6 @@ jobs:
         working-directory: ./frontend
         continue-on-error: true
 
-      # Label | test-passed
-      - name: Add label "test-passed"
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
-            if (pullNumber) {
-              await github.rest.issues.addLabels({
-                issue_number: pullNumber,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                labels: ["test-passed"]
-              });
-            }
-
-      # Отправляем уведомления в Telegram для каждого теста
       - name: Send individual Telegram notifications for frontend tests
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -105,7 +93,7 @@ jobs:
             cat jest-results.json | jq -c '.testResults[].assertionResults[]' | while read -r test; do
               TEST_NAME=$(echo "$test" | jq -r '.fullName')
               TEST_STATUS=$(echo "$test" | jq -r '.status')
-              MESSAGE="Test: $TEST_NAME\nStatus: $TEST_STATUS"
+              MESSAGE="GITHUB_DEVOPS_BOT%0ATest Frontend: $TEST_NAME%0AStatus: $TEST_STATUS"
               curl -s -X POST \
                 https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
                 -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -116,7 +104,20 @@ jobs:
         working-directory: ./frontend
         shell: bash
 
-      # Настройка и тестирование бэкенда
+      - name: Set test status
+        id: test-status
+        run: |
+          echo "status=${{ steps.frontend-tests.outcome }}" >> $GITHUB_OUTPUT
+
+  backend-tests:
+    needs: create-pr
+    runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.test-status.outputs.status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -134,27 +135,13 @@ jobs:
         working-directory: ./backend
         continue-on-error: true
 
-      # Определяем общий статус тестирования
-      - name: Determine test status
-        id: test-status
-        run: |
-          FRONTEND_STATUS="${{ steps.frontend-tests.outcome }}"
-          BACKEND_STATUS="${{ steps.backend-tests.outcome }}"
-          if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
-            echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}" >> $GITHUB_ENV
-            echo "STATUS=success" >> $GITHUB_ENV
-          else
-            echo "MESSAGE=❌ Some tests failed!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}%0AFrontend: $FRONTEND_STATUS%0ABackend: $BACKEND_STATUS" >> $GITHUB_ENV
-            echo "STATUS=failure" >> $GITHUB_ENV
-          fi
-        shell: bash
-
-      # Отправляем итоговое уведомление в Telegram
-      - name: Send Telegram final notification
+      - name: Send Telegram notification - Backend Tests
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          STATUS="${{ steps.backend-tests.outcome }}"
+          MESSAGE="GITHUB_DEVOPS_BOT%0ABackend Tests Completed%0AStatus: $STATUS"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -162,7 +149,86 @@ jobs:
             -d parse_mode="HTML"
         shell: bash
 
-      # Отправляем итоговое уведомление по email
+      - name: Set test status
+        id: test-status
+        run: |
+          echo "status=${{ steps.backend-tests.outcome }}" >> $GITHUB_OUTPUT
+
+  test-notify:
+    needs: [create-pr, frontend-tests, backend-tests]
+    runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.test-status.outputs.test_status }}
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: get-version
+        run: |
+          VERSION=$(cat version/version)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Add build version label
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            const version = "${{ env.VERSION }}".replace(/\./g, '-');
+            if (pullNumber && version) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: [`build-v${version}`]
+              });
+            }
+
+      - name: Add label "test-passed"
+        if: ${{ needs.frontend-tests.outputs.test_status == 'success' && needs.backend-tests.outputs.test_status == 'success' }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["test-passed"]
+              });
+            }
+
+      - name: Determine test status
+        id: test-status
+        run: |
+          FRONTEND_STATUS="${{ needs.frontend-tests.outputs.test_status }}"
+          BACKEND_STATUS="${{ needs.backend-tests.outputs.test_status }}"
+          if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
+            echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}" >> $GITHUB_ENV
+            echo "test_status=success" >> $GITHUB_OUTPUT
+          else
+            echo "MESSAGE=❌ Some tests failed!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}%0AFrontend: $FRONTEND_STATUS%0ABackend: $BACKEND_STATUS" >> $GITHUB_ENV
+            echo "test_status=failure" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Send Telegram notification - Test Summary
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MESSAGE="GITHUB_DEVOPS_BOT%0A${MESSAGE}%0AТекущий этап: Завершение тестов"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
+
       - name: Send email with test results
         uses: dawidd6/action-send-mail@v3
         with:
@@ -178,62 +244,130 @@ jobs:
             ${{ env.MESSAGE }}
           secure: true
 
-    outputs:
-      test_status: ${{ env.STATUS }}
-      version: ${{ env.VERSION }}
-
   auto-merge:
-    needs: [create-pr, test-and-notify]
+    needs: [create-pr, test-notify, sonar-analysis]
     runs-on: ubuntu-latest
-    if: needs.test-and-notify.outputs.test_status == 'success'
+    if: needs.test-notify.outputs.test_status == 'success'
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
+  
+      - name: Setup Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+  
+      - name: Force Merge Feature Branch into Develop Locally
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+          git fetch origin
+          git checkout ${{ github.ref_name }}
+          git pull origin ${{ github.ref_name }} --ff-only
+          git checkout develop
+          git pull origin develop --ff-only
+          git merge ${{ github.ref_name }} -X ours --allow-unrelated-histories -m "Force merge ${{ github.ref_name }} into develop" || {
+            echo "Conflicts detected, forcing feature branch changes over develop"
+            git checkout --ours .
+            git add .
+            git commit -m "Force resolved conflicts in favor of ${{ github.ref_name }}"
+          }
+          git push origin develop --force
+  
+      - name: Update and Merge Pull Request via API with Force
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (!pullNumber) {
+              console.log("No pull request number available to merge.");
+              process.exit(1);
+            }
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = Number(pullNumber);
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber
+            });
+            console.log(`PR #${prNumber} mergeable state: ${pr.mergeable_state}`);
+            try {
+              const response = await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: prNumber,
+                merge_method: 'merge',
+                commit_title: `Force merge PR #${prNumber} into develop`,
+                commit_message: 'Force merged by CI/CD pipeline, overwriting develop with feature branch changes'
+              });
+              console.log(`Pull Request #${prNumber} force merged successfully: ${response.data.sha}`);
+            } catch (error) {
+              console.error(`Failed to force merge PR #${prNumber}: ${error.message}`);
+              console.log("Falling back to local force push result.");
+            }
 
-      # Автоматический мердж PR в develop
-      - name: Merge Pull Request
+      - name: Send Telegram notification - Merge Completed
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MESSAGE="GITHUB_DEVOPS_BOT%0APR #${{ needs.create-pr.outputs.pr_number }} успешно смержен%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
+
+      - name: Add label "PROD"
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
             if (pullNumber) {
-              await github.rest.pulls.merge({
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                pull_number: pullNumber,
-                merge_method: 'merge'
+                labels: ["PROD"]
               });
-              console.log(`Pull Request #${pullNumber} merged successfully.`);
-            } else {
-              console.log("No pull request number available to merge.");
             }
 
   sonar-analysis:
-    needs: test-and-notify
+    needs: test-notify
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
 
   status:
-    needs: test-and-notify
+    needs: test-notify
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check test results
         run: |
-          if [ "${{ needs.test-and-notify.outputs.test_status }}" != "success" ]; then
+          if [ "${{ needs.test-notify.outputs.test_status }}" != "success" ]; then
             exit 1
           fi
 
   docker-push:
-    needs: test-and-notify
+    needs: test-notify
     permissions:
       contents: read
       packages: write
       id-token: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -247,7 +381,6 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:v${{ needs.test-and-notify.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:latest
           push: true
@@ -258,7 +391,75 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:v${{ needs.test-and-notify.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
+
+      - name: Send Telegram notification - Docker Push Completed
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MESSAGE="GITHUB_DEVOPS_BOT%0A Docker образы успешно загружены%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AПроект: ${{ github.repository }}"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
+
+      - name: Add label "dockerhub"
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["dockerhub"]
+              });
+            }
+
+  final-report:
+    needs: [create-pr, frontend-tests, backend-tests, test-notify, auto-merge, sonar-analysis, status, docker-push]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send Final Telegram Report
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          # Основное сообщение с дополнительными ссылками
+          MESSAGE="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: land_devops%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: makarmarkov%0AНазвание: land_devops%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: makarmarkov/land_devops:v${{ needs.test-notify.outputs.version }}%0A%0AСсылка на Докер Хаб: https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend%0AСсылка на пайплайн: ${{ github.run_url }}"
+          
+          # Отправка основного сообщения как текст
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML" || echo "Failed to send base report"
+
+          # Отправка changelog.md как файл
+          if [ -f changelog.md ]; then
+            curl -s -X POST \
+              https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument \
+              -F chat_id=${TELEGRAM_CHAT_ID} \
+              -F document=@changelog.md \
+              -F caption="GITHUB_DEVOPS_BOT%0AChangelog для версии ${{ needs.test-notify.outputs.version }}" \
+              -F parse_mode="HTML" || echo "Failed to send changelog file"
+          else
+            # Сообщение об отсутствии changelog
+            curl -s -X POST \
+              https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+              -d chat_id=${TELEGRAM_CHAT_ID} \
+              -d text="GITHUB_DEVOPS_BOT%0AChangelog not found" \
+              -d parse_mode="HTML" || echo "Failed to send changelog not found message"
+          fi
+        shell: bash
