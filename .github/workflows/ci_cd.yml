@@ -66,7 +66,7 @@ jobs:
     needs: create-pr
     runs-on: ubuntu-latest
     outputs:
-      test_status: ${{ steps.set-test-status.outputs.status }}
+      test_status: ${{ steps.set-frontend-status.outputs.status }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -115,7 +115,7 @@ jobs:
     needs: create-pr
     runs-on: ubuntu-latest
     outputs:
-      test_status: ${{ steps.set-test-status.outputs.status }}
+      test_status: ${{ steps.set-backend-status.outputs.status }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -357,7 +357,7 @@ jobs:
   auto-merge:
     needs: [create-pr, test-notify, sonar-analysis]
     runs-on: ubuntu-latest
-    if: needs.test-notify.outputs.test_status == 'success'
+    if: always()
     permissions:
       contents: write
       pull-requests: write
@@ -522,6 +522,7 @@ jobs:
   deploy-dev:
     needs: [auto-merge, docker-push]
     runs-on: ubuntu-latest
+    if: always()
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -542,13 +543,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-  
+
       - name: Send Final Telegram Report
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Формирование отчёта с динамическими данными:
           REPORT="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: land_devops%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: makarmarkov%0AНазвание: land_devops%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: makarmarkov/land_devops:v${{ needs.test-notify.outputs.version }}"
           echo "$REPORT"
           curl -s -X POST \
@@ -556,7 +556,7 @@ jobs:
             -d chat_id=${TELEGRAM_CHAT_ID} \
             -d text="$REPORT" \
             -d parse_mode="HTML" || echo "Не удалось отправить основной отчёт"
-  
+
       - name: Send Changelog File (if exists)
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -575,4 +575,5 @@ jobs:
               -d chat_id=${TELEGRAM_CHAT_ID} \
               -d text="GITHUB_DEVOPS_BOT%0AChangelog not found" \
               -d parse_mode="HTML" || echo "Не удалось отправить сообщение об отсутствии changelog"
+          fi
         shell: bash
