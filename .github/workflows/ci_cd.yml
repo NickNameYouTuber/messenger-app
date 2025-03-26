@@ -7,6 +7,13 @@ on:
       - 'hotfix/*'
   workflow_dispatch:
 
+env:
+  VERSION_UP: '.github/scripts/version_up.py'
+  NAME_VERSION_FILE: 'version/version'
+  MAJOR: 'major'
+  MINOR: 'minor'
+  PATCH: 'patch'
+
 jobs:
   ## 1. Создание Pull Request в develop из feature/hotfix
   create-pr:
@@ -180,7 +187,7 @@ jobs:
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
 
-  ## 6. Автоматическое версионирование и обновление changelog/version (перенесено выше)
+  ## 6. Автоматическое версионирование и обновление changelog/version
   versioning:
     needs: create-pr
     runs-on: ubuntu-latest
@@ -189,28 +196,75 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Bump version and update changelog
-        id: set-version
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Extract branch name
+        id: branch-names
         run: |
-          # Читаем текущую версию из файла
-          CURRENT_VERSION=$(cat version/version)
-          echo "Current version: $CURRENT_VERSION"
-          BRANCH_NAME=${GITHUB_REF##*/}
-          echo "Branch: $BRANCH_NAME"
-          # Если ветка feature - повышаем minor, если hotfix - patch
-          if [[ "$BRANCH_NAME" == feature/* ]]; then
-            NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. -v OFS=. '{$2++; print}')
-          elif [[ "$BRANCH_NAME" == hotfix/* ]]; then
-            NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. -v OFS=. '{$3++; print}')
+          BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\///')
+          echo "current_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Update version [minor]
+        if: startsWith(steps.branch-names.outputs.current_branch, 'feature')
+        run: |
+          python ${{ env.VERSION_UP }} ${{ env.NAME_VERSION_FILE }} ${{ env.MINOR }}
+          VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
+          echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Update version [patch]
+        if: startsWith(steps.branch-names.outputs.current_branch, 'hotfix')
+        run: |
+          python ${{ env.VERSION_UP }} ${{ env.NAME_VERSION_FILE }} ${{ env.PATCH }}
+          VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
+          echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Get commit messages
+        id: commit
+        run: |
+          if [ -f .last_commit ]; then
+            PREV_COMMIT=$(cat .last_commit)
           else
-            NEW_VERSION=$CURRENT_VERSION
+            PREV_COMMIT=$(git rev-parse HEAD~1)
           fi
-          echo "New version: $NEW_VERSION"
-          echo $NEW_VERSION > version/version
-          # Обновляем changelog (записываем новую запись в начало файла)
-          echo "Version $NEW_VERSION - $(date '+%Y-%m-%d')" > changelog.md
-          echo "Changelog updated"
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          COMMIT_MSG=$(git log ${PREV_COMMIT}..HEAD --pretty=format:"- %s")
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          git rev-parse HEAD > .last_commit
+
+      - name: Update Changelog
+        if: env.NEW_VERSION != ''
+        run: |
+          TIMESTAMP=$(date '+%d.%m.%Y %H:%M:%S')
+          CHANGELOG_FILE="changelog.md"
+          if [ ! -f "$CHANGELOG_FILE" ]; then
+            echo "# Changelog" > $CHANGELOG_FILE
+            echo "" >> $CHANGELOG_FILE
+          fi
+          echo "## [${{ env.NEW_VERSION }}] - $TIMESTAMP" >> $CHANGELOG_FILE
+          echo "" >> $CHANGELOG_FILE
+          echo "${{ steps.commit.outputs.message }}" >> $CHANGELOG_FILE
+          echo "" >> $CHANGELOG_FILE
+
+      - name: Commit version and changelog
+        if: env.NEW_VERSION != ''
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add ${{ env.NAME_VERSION_FILE }} version/version_log changelog.md .last_commit
+          git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog"
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+
+      - name: Set version output
+        id: set-version
+        run: echo "version=${{ env.NEW_VERSION }}" >> $GITHUB_OUTPUT
 
   ## 7. Уведомление о тестах, сборка email и Telegram уведомлений, добавление лейблов для версии
   test-notify:
