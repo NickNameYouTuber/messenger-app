@@ -197,7 +197,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -259,8 +259,8 @@ jobs:
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git add ${{ env.NAME_VERSION_FILE }} version/version_log changelog.md .last_commit
-          git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog"
-          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog" || echo "No changes to commit"
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }} --force
 
       - name: Set version output
         id: set-version
