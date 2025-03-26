@@ -1,0 +1,74 @@
+name: Auto Force Merge Develop to Master
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - master
+
+jobs:
+  auto-force-merge:
+    if: github.event.pull_request.head.ref == 'develop'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Setup Git configuration
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Force Merge Develop into Master Locally
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          # Устанавливаем URL с использованием токена для авторизации
+          git remote set-url origin https://${PAT_TOKEN}@github.com/${{ github.repository }}.git
+          git fetch origin
+          
+          # Обновляем ветку develop
+          git checkout develop
+          git pull origin develop --ff-only
+          
+          # Обновляем ветку master
+          git checkout master
+          git pull origin master --ff-only
+          
+          # Сливаем develop в master с форсированием
+          git merge develop -X ours --allow-unrelated-histories -m "Auto force merge develop into master" || {
+            echo "Конфликты обнаружены, разрешаем их в пользу develop"
+            git checkout --ours .
+            git add .
+            git commit -m "Auto force resolved conflicts in favor of develop"
+          }
+          git push origin master --force
+
+      - name: Update Pull Request Status via API
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            const prNumber = github.event.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            try {
+              const response = await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: prNumber,
+                merge_method: 'merge',
+                commit_title: `Auto force merge PR #${prNumber} from develop to master`,
+                commit_message: 'Auto force merged by pipeline, merging develop into master'
+              });
+              console.log(`Pull Request #${prNumber} force merged successfully: ${response.data.sha}`);
+            } catch (error) {
+              console.error(`Error during force merge of PR #${prNumber}: ${error.message}`);
+              process.exit(1);
+            }
