@@ -384,3 +384,7 @@
 
 - Bump version to 0.46.0 and update changelog
 
+## [0.48.0] - 26.03.2025 16:00:05
+
+- Bump version to 0.47.0 and update changelog
+
