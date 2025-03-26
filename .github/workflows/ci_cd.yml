@@ -15,8 +15,25 @@ env:
   PATCH: 'patch'
 
 jobs:
-  ## 1. Создание Pull Request в develop из feature/hotfix
+  check-skip:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.check-commit.outputs.should_skip }}
+    steps:
+      - name: Check commit message
+        id: check-commit
+        run: |
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MESSAGE" | grep -q "\[skip ci\]"; then
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
   create-pr:
+    needs: check-skip
+    if: needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     outputs:
       pr_number: ${{ steps.create-pr.outputs.result }}
@@ -68,9 +85,9 @@ jobs:
             -d text="$MESSAGE" \
             -d parse_mode="HTML"
 
-  ## 2. Тестирование фронтенда
   frontend-tests:
-    needs: create-pr
+    needs: [check-skip, create-pr]
+    if: needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     outputs:
       test_status: ${{ steps.set-frontend-status.outputs.status }}
@@ -117,9 +134,9 @@ jobs:
         id: set-frontend-status
         run: echo "status=${{ steps.frontend-tests.outcome }}" >> $GITHUB_OUTPUT
 
-  ## 3. Тестирование backend
   backend-tests:
-    needs: create-pr
+    needs: [check-skip, create-pr]
+    if: needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     outputs:
       test_status: ${{ steps.set-backend-status.outputs.status }}
@@ -162,9 +179,9 @@ jobs:
         id: set-backend-status
         run: echo "status=${{ steps.backend-tests.outcome }}" >> $GITHUB_OUTPUT
 
-  ## 4. Антивирус (Security) тесты
   antivirus-tests:
-    needs: create-pr
+    needs: [check-skip, create-pr]
+    if: needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     outputs:
       sec_status: ${{ steps.set-sec-status.outputs.sec_status }}
@@ -175,21 +192,20 @@ jobs:
         id: antivirus
         run: |
           echo "Running antivirus tests..."
-          # Здесь должна быть логика сканирования; эмулируем успешный результат.
           exit 0
       - name: Set security test status
         id: set-sec-status
         run: echo "sec_status=success" >> $GITHUB_OUTPUT
 
-  ## 5. Проверка кода (Sonar, линтер, уязвимости)
   sonar-analysis:
-    needs: [frontend-tests, backend-tests]
+    needs: [check-skip, frontend-tests, backend-tests]
+    if: needs.check-skip.outputs.should_skip == 'false'
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
 
-  ## 6. Автоматическое версионирование и обновление changelog/version
   versioning:
-    needs: create-pr
+    needs: [check-skip, create-pr]
+    if: needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.set-version.outputs.version }}
@@ -259,16 +275,16 @@ jobs:
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git add ${{ env.NAME_VERSION_FILE }} version/version_log changelog.md .last_commit
-          git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog" || echo "No changes to commit"
+          git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog [skip ci]" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }} --force
 
       - name: Set version output
         id: set-version
         run: echo "version=${{ env.NEW_VERSION }}" >> $GITHUB_OUTPUT
 
-  ## 7. Уведомление о тестах, сборка email и Telegram уведомлений, добавление лейблов для версии
   test-notify:
-    needs: [create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis, versioning]
+    needs: [check-skip, create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis, versioning]
+    if: needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     outputs:
       test_status: ${{ steps.determine-status.outputs.test_status }}
@@ -373,11 +389,10 @@ jobs:
             ${{ env.MESSAGE }}
           secure: true
 
-  ## 8. Автоматическое слияние в develop (force merge) и установка лейбла PROD
   auto-merge:
-    needs: [create-pr, test-notify, sonar-analysis]
+    needs: [check-skip, create-pr, test-notify, sonar-analysis]
+    if: always() && needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
-    if: always()
     permissions:
       contents: write
       pull-requests: write
@@ -472,9 +487,9 @@ jobs:
               });
             }
 
-  ## 9. Публикация Docker-образов и установка лейбла dockerhub
   docker-push:
-    needs: test-notify
+    needs: [check-skip, test-notify]
+    if: needs.check-skip.outputs.should_skip == 'false'
     permissions:
       contents: read
       packages: write
@@ -538,28 +553,24 @@ jobs:
               });
             }
 
-  ## 10. Деплой на дев сервер и развёртывание pod-ов в Kubernetes
   deploy-dev:
-    needs: [auto-merge, docker-push]
+    needs: [check-skip, auto-merge, docker-push]
+    if: always() && needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
-    if: always()
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Deploy to Development Server
         run: |
           echo "Deploying to dev server..."
-          # Здесь добавьте команды для деплоя (например, через SSH)
       - name: Deploy Kubernetes Pods
         run: |
           echo "Deploying pods in Kubernetes..."
-          # Здесь добавьте команды для обновления pod-ов (например, через kubectl)
 
-  ## 11. Финальный отчёт
   final-report:
-    needs: [create-pr, frontend-tests, backend-tests, test-notify, auto-merge, sonar-analysis, docker-push]
+    needs: [check-skip, create-pr, frontend-tests, backend-tests, test-notify, auto-merge, sonar-analysis, docker-push]
+    if: always() && needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
-    if: always()
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
