@@ -55,7 +55,12 @@ jobs:
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
           script: |
-            const prNumber = github.event.pull_request.number;
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              console.log("Нет информации о pull request в payload, пропускаем обновление статуса.");
+              return;
+            }
+            const prNumber = pr.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             try {
@@ -72,4 +77,3 @@ jobs:
               console.error(`Error during force merge of PR #${prNumber}: ${error.message}`);
               process.exit(1);
             }
-
