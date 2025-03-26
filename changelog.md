@@ -404,3 +404,7 @@
 
 - Bump version to 0.51.0 and update changelog
 
+## [0.53.0] - 26.03.2025 16:01:43
+
+- Bump version to 0.52.0 and update changelog
+
