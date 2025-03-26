@@ -36,7 +36,7 @@ jobs:
             echo "should_skip=false" >> $GITHUB_OUTPUT
           fi
         shell: bash
-        
+
   create-pr:
     needs: check-skip
     if: needs.check-skip.outputs.should_skip == 'false'
@@ -209,53 +209,6 @@ jobs:
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
 
-  versioning:
-    if: |
-      github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'develop'
-    runs-on: ubuntu-latest      
-    outputs:
-      version: ${{ steps.set-version.outputs.version }}
-    steps:
-      - name: Checkout develop branch
-        uses: actions/checkout@v4
-        with:
-          ref: develop
-          token: ${{ secrets.PAT_TOKEN }}
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Determine version bump type
-        id: bump-type
-        run: |
-          if [[ "${{ github.event.pull_request.head.ref }}" == feature/* ]]; then
-            echo "BUMP_TYPE=minor" >> $GITHUB_ENV
-          elif [[ "${{ github.event.pull_request.head.ref }}" == hotfix/* ]]; then
-            echo "BUMP_TYPE=patch" >> $GITHUB_ENV
-          fi
-
-      - name: Update version
-        run: |
-          python ${{ env.VERSION_UP }} ${{ env.NAME_VERSION_FILE }} ${{ env.BUMP_TYPE }}
-          echo "NEW_VERSION=$(cat ${{ env.NAME_VERSION_FILE }})" >> $GITHUB_ENV
-
-      - name: Commit version changes
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add ${{ env.NAME_VERSION_FILE }} version/version_log
-          git commit -m "Bump version to ${{ env.NEW_VERSION }} [skip ci]"
-          git push origin develop
-
-      - name: Set version output
-        id: set-version
-        run: echo "version=${{ env.NEW_VERSION }}" >> $GITHUB_OUTPUT
-
   test-notify:
     needs: [check-skip, create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis]
     if: needs.check-skip.outputs.should_skip == 'false'
@@ -363,9 +316,71 @@ jobs:
             ${{ env.MESSAGE }}
           secure: true
 
+  versioning:
+    needs: [check-skip, create-pr, test-notify, sonar-analysis]
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'develop' &&
+      needs.check-skip.outputs.should_skip == 'false' &&
+      needs.test-notify.outputs.test_status == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+    steps:
+      - name: Debug event data
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Event action: ${{ github.event.action }}"
+          echo "PR merged: ${{ github.event.pull_request.merged }}"
+          echo "PR base ref: ${{ github.event.pull_request.base.ref }}"
+          echo "PR head ref: ${{ github.event.pull_request.head.ref }}"
+          echo "Test status: ${{ needs.test-notify.outputs.test_status }}"
+
+      - name: Checkout develop branch
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Determine version bump type
+        id: bump-type
+        run: |
+          if [[ "${{ github.event.pull_request.head.ref }}" == feature/* ]]; then
+            echo "BUMP_TYPE=minor" >> $GITHUB_ENV
+          elif [[ "${{ github.event.pull_request.head.ref }}" == hotfix/* ]]; then
+            echo "BUMP_TYPE=patch" >> $GITHUB_ENV
+          fi
+
+      - name: Update version
+        run: |
+          python ${{ env.VERSION_UP }} ${{ env.NAME_VERSION_FILE }} ${{ env.BUMP_TYPE }}
+          echo "NEW_VERSION=$(cat ${{ env.NAME_VERSION_FILE }})" >> $GITHUB_ENV
+
+      - name: Commit version changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add ${{ env.NAME_VERSION_FILE }} version/version_log
+          git commit -m "Bump version to ${{ env.NEW_VERSION }} [skip ci]"
+          git push origin develop
+
+      - name: Set version output
+        id: set-version
+        run: echo "version=${{ env.NEW_VERSION }}" >> $GITHUB_OUTPUT
+
   auto-merge:
     needs: [check-skip, create-pr, test-notify, sonar-analysis, versioning]
-    if: always() && needs.check-skip.outputs.should_skip == 'false'
+    if: |
+      needs.check-skip.outputs.should_skip == 'false' &&
+      needs.test-notify.outputs.test_status == 'success' &&
+      needs.versioning.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -462,16 +477,19 @@ jobs:
             }
 
   docker-push:
-    needs: [versioning]
+    needs: [versioning, auto-merge]
     if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/develop')) ||
-      (github.event.pull_request.merged == true)
+      needs.versioning.result == 'success' &&
+      needs.auto-merge.result == 'success'
     permissions:
       contents: read
       packages: write
       id-token: write
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -497,13 +515,13 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:${{ needs.versioning.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
-          
+
       - name: Send Telegram notification - Docker Push Completed
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          MESSAGE="Docker образы успешно загружены%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AПроект: ${{ github.repository }}"
+          MESSAGE="Docker образы успешно загружены%0AВерсия: ${{ needs.versioning.outputs.version }}%0AПроект: ${{ github.repository }}"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -528,20 +546,38 @@ jobs:
 
   deploy-dev:
     needs: [check-skip, auto-merge, docker-push]
-    if: always() && needs.check-skip.outputs.should_skip == 'false'
+    if: |
+      needs.check-skip.outputs.should_skip == 'false' &&
+      needs.auto-merge.result == 'success' &&
+      needs.docker-push.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Deploy to Development Server
         run: |
           echo "Deploying to dev server..."
+
       - name: Deploy Kubernetes Pods
         run: |
           echo "Deploying pods in Kubernetes..."
 
+  deploy-prod:
+    needs: [deploy-dev]
+    if: |
+      needs.deploy-dev.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Production Server
+        run: |
+          echo "Deploying to prod server..."
+
   final-report:
-    needs: [check-skip, create-pr, frontend-tests, backend-tests, test-notify, auto-merge, sonar-analysis, docker-push]
+    needs: [check-skip, create-pr, frontend-tests, backend-tests, test-notify, auto-merge, sonar-analysis, docker-push, deploy-dev, deploy-prod]
     if: always() && needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     steps:
