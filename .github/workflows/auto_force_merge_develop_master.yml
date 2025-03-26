@@ -72,3 +72,4 @@ jobs:
               console.error(`Error during force merge of PR #${prNumber}: ${error.message}`);
               process.exit(1);
             }
+
