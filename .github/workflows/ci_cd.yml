@@ -210,7 +210,6 @@ jobs:
     secrets: inherit
 
   versioning:
-    needs: [auto-merge]
     if: |
       github.event_name == 'pull_request' &&
       github.event.action == 'closed' &&
@@ -258,7 +257,7 @@ jobs:
         run: echo "version=${{ env.NEW_VERSION }}" >> $GITHUB_OUTPUT
 
   test-notify:
-    needs: [check-skip, create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis, versioning]
+    needs: [check-skip, create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis]
     if: needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     outputs:
@@ -365,7 +364,7 @@ jobs:
           secure: true
 
   auto-merge:
-    needs: [check-skip, create-pr, test-notify, sonar-analysis]
+    needs: [check-skip, create-pr, test-notify, sonar-analysis, versioning]
     if: always() && needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     permissions:
