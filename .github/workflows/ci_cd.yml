@@ -347,7 +347,7 @@ jobs:
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
     
-  post-sonar-label:
+  sec-passed-label:
     needs: sonar-analysis
     runs-on: ubuntu-latest
     permissions:
@@ -385,6 +385,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
+      issues: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
