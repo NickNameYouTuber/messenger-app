@@ -191,7 +191,7 @@ jobs:
       version: ${{ env.VERSION }}
 
   auto-merge:
-    needs: [create-pr, test-and-notify, sonar-analysis, post-dockerhub-label, post-sonar-label]
+    needs: [create-pr, test-and-notify, sonar-analysis, post-dockerhub-label, sec-passed-label]
     runs-on: ubuntu-latest
     if: needs.test-and-notify.outputs.test_status == 'success'
     permissions:
@@ -302,7 +302,7 @@ jobs:
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
     
-  post-sonar-label:
+  sec-passed-label:
     needs: sonar-analysis
     runs-on: ubuntu-latest
     permissions:
@@ -340,6 +340,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
+      issues: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
