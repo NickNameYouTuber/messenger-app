@@ -418,3 +418,8 @@
 - Update ci_cd.yml
 - Bump version to 0.54.0 and update changelog
 
+## [0.56.0] - 26.03.2025 16:28:09
+
+- Delete version.yml
+- Bump version to 0.55.0 and update changelog [skip ci]
+
