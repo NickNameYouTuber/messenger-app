@@ -376,3 +376,7 @@
 
 - Bump version to 0.44.0 and update changelog
 
+## [0.46.0] - 26.03.2025 15:59:21
+
+- Bump version to 0.45.0 and update changelog
+
