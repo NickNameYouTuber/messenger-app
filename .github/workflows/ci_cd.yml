@@ -157,15 +157,19 @@ jobs:
   test-notify:
     needs: [create-pr, frontend-tests, backend-tests]
     runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.test-status.outputs.test_status }}
+      version: ${{ steps.get-version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Get version
-        id: version
+        id: get-version
         run: |
           VERSION=$(cat version/version)
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Add build version label
         uses: actions/github-script@v6
@@ -206,10 +210,10 @@ jobs:
           BACKEND_STATUS="${{ needs.backend-tests.outputs.test_status }}"
           if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
             echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}" >> $GITHUB_ENV
-            echo "STATUS=success" >> $GITHUB_ENV
+            echo "test_status=success" >> $GITHUB_OUTPUT
           else
             echo "MESSAGE=❌ Some tests failed!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}%0AFrontend: $FRONTEND_STATUS%0ABackend: $BACKEND_STATUS" >> $GITHUB_ENV
-            echo "STATUS=failure" >> $GITHUB_ENV
+            echo "test_status=failure" >> $GITHUB_OUTPUT
           fi
         shell: bash
 
@@ -239,10 +243,6 @@ jobs:
             The test results are as follows:
             ${{ env.MESSAGE }}
           secure: true
-
-    outputs:
-      test_status: ${{ env.STATUS }}
-      version: ${{ env.VERSION }}
 
   auto-merge:
     needs: [create-pr, test-notify, sonar-analysis]
@@ -366,7 +366,8 @@ jobs:
       id-token: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -406,19 +407,6 @@ jobs:
             -d text="$MESSAGE" \
             -d parse_mode="HTML"
 
-      - name: Send Final Telegram Report
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          CHANGELOG=$(cat changelog.md | sed 's/%/%25/g; s/\n/%0A/g; s/\r//g')
-          MESSAGE="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: land_devops%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: makarmarkov%0AНазвание: land_devops%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: makarmarkov/land_devops:v${{ needs.test-notify.outputs.version }}%0A%0A${CHANGELOG}"
-          curl -s -X POST \
-            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-            -d chat_id=${TELEGRAM_CHAT_ID} \
-            -d text="$MESSAGE" \
-            -d parse_mode="HTML"
-
       - name: Add label "dockerhub"
         if: success()
         uses: actions/github-script@v6
@@ -434,3 +422,28 @@ jobs:
                 labels: ["dockerhub"]
               });
             }
+
+  final-report:
+    needs: [create-pr, frontend-tests, backend-tests, test-notify, auto-merge, sonar-analysis, status, docker-push]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send Final Telegram Report
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -f changelog.md ]; then
+            CHANGELOG=$(cat changelog.md | sed 's/%/%25/g; s/\n/%0A/g; s/\r//g')
+          else
+            CHANGELOG="Changelog not found"
+          fi
+          MESSAGE="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: land_devops%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: makarmarkov%0AНазвание: land_devops%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: makarmarkov/land_devops:v${{ needs.test-notify.outputs.version }}%0A%0A${CHANGELOG}"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML" || echo "Failed to send final report"
