@@ -211,11 +211,10 @@ jobs:
 
   versioning:
     if: |
-      github.event_name == 'pull_request' &&
+      (github.event_name == 'pull_request' &&
       github.event.action == 'closed' &&
       github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'develop' ||
-      github.event_name == 'workflow_dispatch'
+      github.event.pull_request.base.ref == 'develop')
       
     runs-on: ubuntu-latest      
     outputs:
@@ -367,7 +366,9 @@ jobs:
 
   auto-merge:
     needs: [check-skip, create-pr, test-notify, sonar-analysis, versioning]
-    if: always() && needs.check-skip.outputs.should_skip == 'false'
+    if: |
+      needs.check-skip.outputs.should_skip == 'false' &&
+      needs.test-notify.outputs.test_status == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -464,7 +465,7 @@ jobs:
             }
 
   docker-push:
-    needs: [versioning, test-notify, sonar-analysis]
+    needs: [versioning, test-notify]
     if: |
       needs.versioning.result == 'success' &&
       needs.test-notify.outputs.test_status == 'success'
@@ -530,6 +531,9 @@ jobs:
 
   deploy-dev:
     needs: [check-skip, auto-merge, docker-push]
+    if: |
+      needs.auto-merge.result == 'success' &&
+      needs.docker-push.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
