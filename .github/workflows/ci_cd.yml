@@ -210,12 +210,11 @@ jobs:
     secrets: inherit
 
   versioning:
+    needs: [auto-merge]
     if: |
-      (github.event_name == 'pull_request' && 
-       github.event.action == 'closed' &&
-       github.event.pull_request.merged == true &&
-       github.event.pull_request.base.ref == 'develop') 
-      || github.event_name == 'workflow_dispatch'
+      (github.event.pull_request.merged == true || 
+      github.event_name == 'workflow_dispatch') &&
+      needs.auto-merge.result == 'success'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.set-version.outputs.version }}
@@ -463,9 +462,10 @@ jobs:
             }
 
   docker-push:
+    needs: [versioning]
     if: |
-      github.event.pull_request.merged == true 
-      || github.event_name == 'workflow_dispatch'
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/develop')) ||
+      (github.event.pull_request.merged == true)
     permissions:
       contents: read
       packages: write
