@@ -214,7 +214,9 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.action == 'closed' &&
       github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'develop'
+      github.event.pull_request.base.ref == 'develop' ||
+      github.event_name == 'workflow_dispatch'
+      
     runs-on: ubuntu-latest      
     outputs:
       version: ${{ steps.set-version.outputs.version }}
@@ -462,7 +464,10 @@ jobs:
             }
 
   docker-push:
-    needs: [versioning]
+    needs: [versioning, test-notify, sonar-analysis]
+    if: |
+      needs.versioning.result == 'success' &&
+      needs.test-notify.outputs.test_status == 'success'
     permissions:
       contents: read
       packages: write
