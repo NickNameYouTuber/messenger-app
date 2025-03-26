@@ -63,6 +63,22 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "::set-output name=version::${VERSION}"
 
+      # Add label "версия сборки" after versioning
+      - name: Add label "build-version"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["build-version"]
+              });
+            }
+
       # Настройка и тестирование фронтенда
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -133,6 +149,23 @@ jobs:
         run: pytest -v
         working-directory: ./backend
         continue-on-error: true
+
+      # Add label "sec-passed" after backend tests (antivirus check)
+      - name: Add label "sec-passed"
+        uses: actions/github-script@v6
+        if: steps.backend-tests.outcome == 'success'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["sec-passed"]
+              });
+            }
 
       # Определяем общий статус тестирования
       - name: Determine test status
@@ -262,3 +295,19 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
+
+      # Add label "PROD" after pushing Docker images
+      - name: Add label "PROD"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["PROD"]
+              });
+            }
