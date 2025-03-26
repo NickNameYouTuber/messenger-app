@@ -396,3 +396,7 @@
 
 - Bump version to 0.49.0 and update changelog
 
+## [0.51.0] - 26.03.2025 16:01:01
+
+- Bump version to 0.50.0 and update changelog
+
