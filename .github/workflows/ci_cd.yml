@@ -7,8 +7,7 @@ on:
       - 'hotfix/*'
   pull_request:
     types: [closed]
-    branches:
-      - develop
+    branches: [develop]
   workflow_dispatch:
 
 env:
@@ -497,6 +496,18 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:${{ needs.versioning.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
+          
+      - name: Send Telegram notification - Docker Push Completed
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MESSAGE="Docker образы успешно загружены%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AПроект: ${{ github.repository }}"
+          curl -s -X POST \
+            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"
 
       - name: Add label "dockerhub"
         if: success()
