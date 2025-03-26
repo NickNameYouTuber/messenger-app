@@ -304,7 +304,28 @@ jobs:
     needs: test-and-notify
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
-
+    
+  post-sonar-label:
+    needs: sonar-analysis
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Add "sec-passed" label
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["sec-passed"]
+              });
+            }
+      
   status:
     needs: test-and-notify
     runs-on: ubuntu-latest
@@ -391,4 +412,4 @@ jobs:
                 repo: context.repo.repo,
                 labels: ["dockerhub"]
               });
-            }
+            } 
