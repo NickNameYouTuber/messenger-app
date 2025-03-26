@@ -358,3 +358,8 @@
 - Update ci_cd.yml
 - Bump version to 0.40.0 and update changelog
 
+## [0.42.0] - 26.03.2025 15:54:36
+
+- Update ci_cd.yml
+- Bump version to 0.41.0 and update changelog
+
