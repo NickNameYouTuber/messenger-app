@@ -245,7 +245,7 @@ jobs:
           git checkout -b $TASK_BRANCH
           git push origin $TASK_BRANCH
           echo "task_branch=$TASK_BRANCH" >> $GITHUB_OUTPUT
-          
+
   ## 8. Уведомление о тестах, сборка email и Telegram уведомлений, добавление лейблов для версии
   test-notify:
     needs: [create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis, versioning, create-task]
@@ -281,7 +281,7 @@ jobs:
             }
 
       - name: Add label "test-passed"
-        if: ${{ needs.set-frontend-status.outputs.status == 'success' && needs.set-backend-status.outputs.status == 'success' }}
+        if: ${{ needs.frontend-tests.outputs.test_status == 'success' && needs.backend-tests.outputs.test_status == 'success' }}
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -315,8 +315,8 @@ jobs:
       - name: Determine test status
         id: determine-status
         run: |
-          FRONTEND_STATUS="${{ needs.set-frontend-status.outputs.status }}"
-          BACKEND_STATUS="${{ needs.set-backend-status.outputs.status }}"
+          FRONTEND_STATUS="${{ needs.frontend-tests.outputs.test_status }}"
+          BACKEND_STATUS="${{ needs.backend-tests.outputs.test_status }}"
           if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
             echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}" >> $GITHUB_ENV
             echo "test_status=success" >> $GITHUB_OUTPUT
@@ -549,7 +549,9 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          REPORT="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: land_devops%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: makarmarkov%0AНазвание: land_devops%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: makarmarkov/land_devops:v${{ needs.test-notify.outputs.version }}"
+          REPO_OWNER=$(echo "${{ github.repository }}" | cut -d '/' -f 1)
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d '/' -f 2)
+          REPORT="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: ${{ github.repository }}%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: ${{ secrets.DOCKER_HUB_USERNAME }}%0AНазвание: $REPO_NAME%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: ${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME:v${{ needs.test-notify.outputs.version }}%0AСсылки:%0A- Docker Hub: https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME%0A- Стенд: http://ni-corp.tech/"
           echo "$REPORT"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
