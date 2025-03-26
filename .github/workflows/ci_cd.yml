@@ -211,7 +211,7 @@ jobs:
     secrets: inherit
 
   versioning:
-    needs: [check-skip, auto-merge]
+    needs: [auto-merge]
     if: |
       github.event_name == 'pull_request' &&
       github.event.action == 'closed' &&
