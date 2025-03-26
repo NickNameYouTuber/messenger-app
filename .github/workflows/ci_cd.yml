@@ -129,6 +129,21 @@ jobs:
         working-directory: ./backend
         continue-on-error: true
 
+      - name: Add label "backend-test-passed"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["backend-test-passed"]
+              });
+            }
+
       - name: Determine test status
         id: test-status
         run: |
@@ -169,6 +184,21 @@ jobs:
             The test results are as follows:
             ${{ env.MESSAGE }}
           secure: true
+
+      - name: Add label "all-tests-passed"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["all-tests-passed"]
+              });
+            }
 
     outputs:
       test_status: ${{ env.STATUS }}
@@ -266,6 +296,21 @@ jobs:
               console.log("Falling back to local force push result.");
             }
 
+      - name: Add label "merged-to-develop"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["merged-to-develop"]
+              });
+            }
+
   sonar-analysis:
     needs: test-and-notify
     uses: ./.github/workflows/sonar-analysis.yml
@@ -317,3 +362,18 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:new
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
+          
+      - name: Add label "docker-deployed"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            if (pullNumber) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["docker-deployed"]
+              });
+            }
