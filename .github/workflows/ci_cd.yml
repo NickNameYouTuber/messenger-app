@@ -66,7 +66,23 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '16'
-
+          
+      - name: Add build version label
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            const version = "${{ env.VERSION }}".replace(/\./g, '-'); // Заменяем точки на дефисы
+            if (pullNumber && version) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: [`build-v${version}`]
+              });
+            }
+            
       - name: Install frontend dependencies
         run: npm install
         working-directory: ./frontend
@@ -129,21 +145,6 @@ jobs:
         working-directory: ./backend
         continue-on-error: true
 
-      - name: Add label "backend-test-passed"
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
-            if (pullNumber) {
-              await github.rest.issues.addLabels({
-                issue_number: pullNumber,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                labels: ["backend-test-passed"]
-              });
-            }
-
       - name: Determine test status
         id: test-status
         run: |
@@ -184,21 +185,6 @@ jobs:
             The test results are as follows:
             ${{ env.MESSAGE }}
           secure: true
-
-      - name: Add label "all-tests-passed"
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
-            if (pullNumber) {
-              await github.rest.issues.addLabels({
-                issue_number: pullNumber,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                labels: ["all-tests-passed"]
-              });
-            }
 
     outputs:
       test_status: ${{ env.STATUS }}
@@ -296,7 +282,7 @@ jobs:
               console.log("Falling back to local force push result.");
             }
 
-      - name: Add label "merged-to-develop"
+      - name: Add label "PROD"
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -307,7 +293,7 @@ jobs:
                 issue_number: pullNumber,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                labels: ["merged-to-develop"]
+                labels: ["PROD"]
               });
             }
 
@@ -363,7 +349,7 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
           
-      - name: Add label "docker-deployed"
+      - name: Add label "dockerhub"
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -374,6 +360,6 @@ jobs:
                 issue_number: pullNumber,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                labels: ["docker-deployed"]
+                labels: ["dockerhub"]
               });
             }
