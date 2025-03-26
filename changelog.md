@@ -423,3 +423,25 @@
 - Delete version.yml
 - Bump version to 0.55.0 and update changelog [skip ci]
 
+## [0.57.0] - 26.03.2025 23:55:22
+
+- Update ci_cd.yml_old_code
+- Update ci_cd.yml_skip_2_jobs
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Bump version to 0.56.0 and update changelog [skip ci]
+
