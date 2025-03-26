@@ -20,6 +20,9 @@ jobs:
     outputs:
       should_skip: ${{ steps.check-commit.outputs.should_skip }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # Добавляем checkout репозитория
+
       - name: Check commit message
         id: check-commit
         run: |
@@ -30,7 +33,7 @@ jobs:
             echo "should_skip=false" >> $GITHUB_OUTPUT
           fi
         shell: bash
-
+        
   create-pr:
     needs: check-skip
     if: needs.check-skip.outputs.should_skip == 'false'
