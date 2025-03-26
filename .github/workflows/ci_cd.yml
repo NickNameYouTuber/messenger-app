@@ -24,7 +24,7 @@ jobs:
       should_skip: ${{ steps.check-commit.outputs.should_skip }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4  # Добавляем checkout репозитория
+        uses: actions/checkout@v4
 
       - name: Check commit message
         id: check-commit
