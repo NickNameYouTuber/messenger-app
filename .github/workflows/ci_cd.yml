@@ -463,9 +463,6 @@ jobs:
 
   docker-push:
     needs: [versioning]
-    if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/develop')) ||
-      (github.event.pull_request.merged == true)
     permissions:
       contents: read
       packages: write
@@ -528,7 +525,6 @@ jobs:
 
   deploy-dev:
     needs: [check-skip, auto-merge, docker-push]
-    if: always() && needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
