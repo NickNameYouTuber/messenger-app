@@ -436,41 +436,33 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Основное сообщение без changelog
-          BASE_MESSAGE="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: land_devops%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: makarmarkov%0AНазвание: land_devops%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: makarmarkov/land_devops:v${{ needs.test-notify.outputs.version }}"
+          # Основное сообщение
+          MESSAGE="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: land_devops%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: makarmarkov%0AНазвание: land_devops%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: makarmarkov/land_devops:v${{ needs.test-notify.outputs.version }}"
           
-          # Отправка основного сообщения
+          # Отправка основного сообщения как текст
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
-            -d text="$BASE_MESSAGE" \
+            -d text="$MESSAGE" \
             -d parse_mode="HTML" || echo "Failed to send base report"
 
-          # Обработка changelog
+          # Отправка changelog.md как файл
           if [ -f changelog.md ]; then
-            # Читаем changelog и разбиваем на части по 4000 символов
-            CHANGELOG=$(cat changelog.md | sed 's/%/%25/g; s/\r//g')
-            PART=1
-            while [ -n "$CHANGELOG" ]; do
-              # Берем первые 4000 символов (оставляем запас от 4096)
-              CHUNK=$(echo "$CHANGELOG" | head -c 4000)
-              # Удаляем отправленную часть из CHANGELOG
-              CHANGELOG=$(echo "$CHANGELOG" | tail -c +4001)
-              
-              # Заменяем переносы строк только в части
-              CHUNK=$(echo "$CHUNK" | sed 's/\n/%0A/g')
-              
-              # Отправляем часть
-              MESSAGE="GITHUB_DEVOPS_BOT%0AChangelog (Часть $PART):%0A${CHUNK}"
-              curl -s -X POST \
-                https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-                -d chat_id=${TELEGRAM_CHAT_ID} \
-                -d text="$MESSAGE" \
-                -d parse_mode="HTML" || echo "Failed to send changelog part $PART"
-              
-              PART=$((PART + 1))
-            done
+            curl -s -X POST \
+              https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument \
+              -F chat_id=${TELEGRAM_CHAT_ID} \
+              -F document=@changelog.md \
+              -F caption="GITHUB_DEVOPS_BOT%0AChangelog для версии ${{ needs.test-notify.outputs.version }}" \
+              -F parse_mode="HTML" || echo "Failed to send changelog file"
           else
+            # Сообщение об отсутствии changelog
+            curl -s -X POST \
+              https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+              -d chat_id=${TELEGRAM_CHAT_ID} \
+              -d text="GITHUB_DEVOPS_BOT%0AChangelog not found" \
+              -d parse_mode="HTML" || echo "Failed to send changelog not found message"
+          fi
+        shell: bash
             # Отправка сообщения об отсутствии changelog
             MESSAGE="GITHUB_DEVOPS_BOT%0AChangelog not found"
             curl -s -X POST \
