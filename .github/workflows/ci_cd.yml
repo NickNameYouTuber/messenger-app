@@ -54,7 +54,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          MESSAGE="GITHUB_DEVOPS_BOT%0AСоздан новый PR #%{{ steps.create-pr.outputs.result }}%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
+          MESSAGE="Создан новый PR #%{{ steps.create-pr.outputs.result }}%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -95,7 +95,7 @@ jobs:
             cat jest-results.json | jq -c '.testResults[].assertionResults[]' | while read -r test; do
               TEST_NAME=$(echo "$test" | jq -r '.fullName')
               TEST_STATUS=$(echo "$test" | jq -r '.status')
-              MESSAGE="GITHUB_DEVOPS_BOT%0ATest Frontend: $TEST_NAME%0AStatus: $TEST_STATUS"
+              MESSAGE="Test Frontend: $TEST_NAME%0AStatus: $TEST_STATUS"
               curl -s -X POST \
                 https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
                 -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -143,7 +143,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           STATUS="${{ steps.backend-tests.outcome }}"
-          MESSAGE="GITHUB_DEVOPS_BOT%0ABackend Tests Completed%0AStatus: $STATUS"
+          MESSAGE="Backend Tests Completed%0AStatus: $STATUS"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -180,7 +180,7 @@ jobs:
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
 
-  ## 6. Автоматическое версионирование и обновление changelog/version
+  ## 6. Автоматическое версионирование и обновление changelog/version (перенесено выше)
   versioning:
     needs: create-pr
     runs-on: ubuntu-latest
@@ -212,43 +212,9 @@ jobs:
           echo "Changelog updated"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-  ## 7. Создание задачи в GitHub и автоматическое создание ветки под таск
-  create-task:
-    needs: versioning
-    runs-on: ubuntu-latest
-    outputs:
-      task_branch: ${{ steps.set-task.outputs.task_branch }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Create GitHub Issue for Task
-        id: create_issue
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const issue = await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: "New Task: Update for version " + process.env.VERSION,
-              body: "Automated task creation for new version " + process.env.VERSION
-            });
-            console.log("Issue created: #" + issue.data.number);
-            return issue.data.number;
-
-      - name: Create Branch for Task
-        id: set-task
-        run: |
-          TASK_ISSUE=${{ steps.create_issue.outputs.result }}
-          TASK_BRANCH="task-$TASK_ISSUE"
-          git checkout -b $TASK_BRANCH
-          git push origin $TASK_BRANCH
-          echo "task_branch=$TASK_BRANCH" >> $GITHUB_OUTPUT
-
-  ## 8. Уведомление о тестах, сборка email и Telegram уведомлений, добавление лейблов для версии
+  ## 7. Уведомление о тестах, сборка email и Telegram уведомлений, добавление лейблов для версии
   test-notify:
-    needs: [create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis, versioning, create-task]
+    needs: [create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis, versioning]
     runs-on: ubuntu-latest
     outputs:
       test_status: ${{ steps.determine-status.outputs.test_status }}
@@ -331,7 +297,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          MESSAGE="GITHUB_DEVOPS_BOT%0A${MESSAGE}%0AТекущий этап: Завершение тестов"
+          MESSAGE="${MESSAGE}%0AТекущий этап: Завершение тестов"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -353,7 +319,7 @@ jobs:
             ${{ env.MESSAGE }}
           secure: true
 
-  ## 9. Автоматическое слияние в develop (force merge) и установка лейбла PROD
+  ## 8. Автоматическое слияние в develop (force merge) и установка лейбла PROD
   auto-merge:
     needs: [create-pr, test-notify, sonar-analysis]
     runs-on: ubuntu-latest
@@ -430,7 +396,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          MESSAGE="GITHUB_DEVOPS_BOT%0APR #${{ needs.create-pr.outputs.pr_number }} успешно смержен%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
+          MESSAGE="PR #${{ needs.create-pr.outputs.pr_number }} успешно смержен%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -452,7 +418,7 @@ jobs:
               });
             }
 
-  ## 10. Публикация Docker-образов и установка лейбла dockerhub
+  ## 9. Публикация Docker-образов и установка лейбла dockerhub
   docker-push:
     needs: test-notify
     permissions:
@@ -495,7 +461,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          MESSAGE="GITHUB_DEVOPS_BOT%0A Docker образы успешно загружены%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AПроект: ${{ github.repository }}"
+          MESSAGE="Docker образы успешно загружены%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AПроект: ${{ github.repository }}"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -518,7 +484,7 @@ jobs:
               });
             }
 
-  ## 11. Деплой на дев сервер и развёртывание pod-ов в Kubernetes
+  ## 10. Деплой на дев сервер и развёртывание pod-ов в Kubernetes
   deploy-dev:
     needs: [auto-merge, docker-push]
     runs-on: ubuntu-latest
@@ -535,7 +501,7 @@ jobs:
           echo "Deploying pods in Kubernetes..."
           # Здесь добавьте команды для обновления pod-ов (например, через kubectl)
 
-  ## 12. Финальный отчёт
+  ## 11. Финальный отчёт
   final-report:
     needs: [create-pr, frontend-tests, backend-tests, test-notify, auto-merge, sonar-analysis, docker-push]
     runs-on: ubuntu-latest
@@ -551,7 +517,7 @@ jobs:
         run: |
           REPO_OWNER=$(echo "${{ github.repository }}" | cut -d '/' -f 1)
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d '/' -f 2)
-          REPORT="GITHUB_DEVOPS_BOT%0AНовый выпуск изменений%0AПроект: ${{ github.repository }}%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: ${{ secrets.DOCKER_HUB_USERNAME }}%0AНазвание: $REPO_NAME%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: ${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME:v${{ needs.test-notify.outputs.version }}%0AСсылки:%0A- Docker Hub: https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME%0A- Стенд: http://ni-corp.tech/"
+          REPORT="Новый выпуск изменений%0AПроект: ${{ github.repository }}%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: ${{ secrets.DOCKER_HUB_USERNAME }}%0AНазвание: $REPO_NAME%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: ${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME:v${{ needs.test-notify.outputs.version }}%0AСсылки:%0A- Docker Hub: https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME%0A- Стенд: http://ni-corp.tech/"
           echo "$REPORT"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
@@ -569,13 +535,13 @@ jobs:
               https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument \
               -F chat_id=${TELEGRAM_CHAT_ID} \
               -F document=@changelog.md \
-              -F caption="GITHUB_DEVOPS_BOT%0AChangelog для версии ${{ needs.test-notify.outputs.version }}" \
+              -F caption="Changelog для версии ${{ needs.test-notify.outputs.version }}" \
               -F parse_mode="HTML" || echo "Не удалось отправить файл changelog"
           else
             curl -s -X POST \
               https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
               -d chat_id=${TELEGRAM_CHAT_ID} \
-              -d text="GITHUB_DEVOPS_BOT%0AChangelog not found" \
+              -d text="Changelog not found" \
               -d parse_mode="HTML" || echo "Не удалось отправить сообщение об отсутствии changelog"
           fi
         shell: bash
