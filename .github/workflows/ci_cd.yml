@@ -455,8 +455,20 @@ jobs:
 
       - name: Create Git Tag
         run: |
-          git tag v${{ needs.versioning.outputs.version }}
-          git push origin v${{ needs.versioning.outputs.version }}
+          VERSION="${{ needs.versioning.outputs.version }}"
+          if [ -z "$VERSION" ]; then
+            echo "Версия пуста, пропуск создания тега."
+            exit 0
+          fi
+          TAG="v$VERSION"
+          # Если тег уже существует, удаляем его (или можно просто пропустить)
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Тег $TAG уже существует, удаляем старый тег..."
+            git tag -d "$TAG"
+            git push origin --delete "$TAG"
+          fi
+          git tag "$TAG"
+          git push origin "$TAG"
 
       - name: Force Merge Feature Branch into Develop Locally
         env:
@@ -536,7 +548,7 @@ jobs:
                 labels: ["PROD"]
               });
             }
-
+            
   deploy-dev:
     needs: [check-skip, auto-merge, docker-push]
     if: always() && needs.check-skip.outputs.should_skip == 'false'
