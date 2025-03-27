@@ -13,6 +13,7 @@ env:
   MAJOR: 'major'
   MINOR: 'minor'
   PATCH: 'patch'
+  CHANGELOG_FILE: 'changelog.md'
 
 jobs:
   check-skip:
@@ -88,8 +89,25 @@ jobs:
             -d text="$MESSAGE" \
             -d parse_mode="HTML"
 
-  frontend-tests:
+  push-to-branch:
     needs: [check-skip, create-pr]
+    if: needs.check-skip.outputs.should_skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Push to feature/hotfix branch
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
+
+  frontend-tests:
+    needs: [check-skip, create-pr, push-to-branch]
     if: needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     outputs:
@@ -113,32 +131,12 @@ jobs:
         working-directory: ./frontend
         continue-on-error: true
 
-      - name: Send individual Telegram notifications for frontend tests
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          if [ -f jest-results.json ]; then
-            cat jest-results.json | jq -c '.testResults[].assertionResults[]' | while read -r test; do
-              TEST_NAME=$(echo "$test" | jq -r '.fullName')
-              TEST_STATUS=$(echo "$test" | jq -r '.status')
-              MESSAGE="Test Frontend: $TEST_NAME%0AStatus: $TEST_STATUS"
-              curl -s -X POST \
-                https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-                -d chat_id=${TELEGRAM_CHAT_ID} \
-                -d text="$(echo -e "$MESSAGE")" \
-                -d parse_mode="HTML"
-            done
-          fi
-        working-directory: ./frontend
-        shell: bash
-
       - name: Set frontend test status
         id: set-frontend-status
         run: echo "status=${{ steps.frontend-tests.outcome }}" >> $GITHUB_OUTPUT
 
   backend-tests:
-    needs: [check-skip, create-pr]
+    needs: [check-skip, create-pr, push-to-branch]
     if: needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     outputs:
@@ -164,41 +162,9 @@ jobs:
         working-directory: ./backend
         continue-on-error: true
 
-      - name: Send Telegram notification - Backend Tests
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          STATUS="${{ steps.backend-tests.outcome }}"
-          MESSAGE="Backend Tests Completed%0AStatus: $STATUS"
-          curl -s -X POST \
-            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-            -d chat_id=${TELEGRAM_CHAT_ID} \
-            -d text="$MESSAGE" \
-            -d parse_mode="HTML"
-        shell: bash
-
       - name: Set backend test status
         id: set-backend-status
         run: echo "status=${{ steps.backend-tests.outcome }}" >> $GITHUB_OUTPUT
-
-  antivirus-tests:
-    needs: [check-skip, create-pr]
-    if: needs.check-skip.outputs.should_skip == 'false'
-    runs-on: ubuntu-latest
-    outputs:
-      sec_status: ${{ steps.set-sec-status.outputs.sec_status }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Run Antivirus Scan
-        id: antivirus
-        run: |
-          echo "Running antivirus tests..."
-          exit 0
-      - name: Set security test status
-        id: set-sec-status
-        run: echo "sec_status=success" >> $GITHUB_OUTPUT
 
   sonar-analysis:
     needs: [check-skip, frontend-tests, backend-tests]
@@ -206,95 +172,12 @@ jobs:
     uses: ./.github/workflows/sonar-analysis.yml
     secrets: inherit
 
-  versioning:
-    needs: [check-skip, create-pr]
-    if: needs.check-skip.outputs.should_skip == 'false'
+  add-test-passed-label:
+    needs: [check-skip, create-pr, frontend-tests, backend-tests, sonar-analysis]
+    if: needs.check-skip.outputs.should_skip == 'false' && needs.frontend-tests.outputs.test_status == 'success' && needs.backend-tests.outputs.test_status == 'success'
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.set-version.outputs.version }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.PAT_TOKEN }}
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Extract branch name
-        id: branch-names
-        run: |
-          BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\///')
-          echo "current_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
-
-      - name: Update version [minor]
-        if: startsWith(steps.branch-names.outputs.current_branch, 'feature')
-        run: |
-          python ${{ env.VERSION_UP }} ${{ env.NAME_VERSION_FILE }} ${{ env.MINOR }}
-      - name: Update version [patch]
-        if: startsWith(steps.branch-names.outputs.current_branch, 'hotfix')
-        run: |
-          python ${{ env.VERSION_UP }} ${{ env.NAME_VERSION_FILE }} ${{ env.PATCH }}
-
-      - name: Commit version and update changelog
-        run: |
-          NEW_VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
-          TIMESTAMP=$(date '+%d.%m.%Y %H:%M:%S')
-          CHANGELOG_FILE="changelog.md"
-          if [ ! -f "$CHANGELOG_FILE" ]; then
-            echo "# Changelog" > $CHANGELOG_FILE
-            echo "" >> $CHANGELOG_FILE
-          fi
-          echo "## [${NEW_VERSION}] - $TIMESTAMP" >> $CHANGELOG_FILE
-          echo "" >> $CHANGELOG_FILE
-          git config user.name "GitHub Action"
-          git config user.email "action@github.com"
-          git add ${{ env.NAME_VERSION_FILE }} version/version_log changelog.md
-          git commit -m "Bump version to ${NEW_VERSION} and update changelog [skip ci]" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }} --force
-          echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Set version output
-        id: set-version
-        run: echo "version=$(cat ${{ env.NAME_VERSION_FILE }})" >> $GITHUB_OUTPUT
-
-  test-notify:
-    needs: [check-skip, create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis, versioning]
-    if: needs.check-skip.outputs.should_skip == 'false'
-    runs-on: ubuntu-latest
-    outputs:
-      test_status: ${{ steps.determine-status.outputs.test_status }}
-      version: ${{ steps.get-version.outputs.version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Get version from versioning output
-        id: get-version
-        run: |
-          echo "version=${{ needs.versioning.outputs.version }}" >> $GITHUB_OUTPUT
-
-      - name: Add build version label
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
-            const version = "${{ needs.versioning.outputs.version }}".replace(/\./g, '-');
-            if (pullNumber && version) {
-              await github.rest.issues.addLabels({
-                issue_number: pullNumber,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                labels: [`build-v${version}`]
-              });
-            }
-
       - name: Add label "test-passed"
-        if: ${{ needs.frontend-tests.outputs.test_status == 'success' && needs.backend-tests.outputs.test_status == 'success' }}
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -309,8 +192,28 @@ jobs:
               });
             }
 
+  antivirus-tests:
+    needs: [check-skip, create-pr, sonar-analysis]
+    if: needs.check-skip.outputs.should_skip == 'false'
+    runs-on: ubuntu-latest
+    outputs:
+      sec_status: ${{ steps.set-sec-status.outputs.sec_status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Antivirus Scan
+        id: antivirus
+        run: |
+          echo "Running antivirus tests..."
+          exit 0
+
+      - name: Set security test status
+        id: set-sec-status
+        run: echo "sec_status=success" >> $GITHUB_OUTPUT
+
       - name: Add label "sec-passed"
-        if: ${{ needs.antivirus-tests.outputs.sec_status == 'success' }}
+        if: steps.set-sec-status.outputs.sec_status == 'success'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -324,6 +227,133 @@ jobs:
                 labels: ["sec-passed"]
               });
             }
+
+  versioning:
+    needs: [check-skip, create-pr, antivirus-tests]
+    if: needs.check-skip.outputs.should_skip == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+    steps:
+      - name: Checkout develop branch
+        uses: actions/checkout@v4
+        with:
+          ref: 'develop'
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Extract branch name
+        id: branch-names
+        run: |
+          BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\///')
+          echo "current_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Update version [minor] if feature branch
+        if: startsWith(steps.branch-names.outputs.current_branch, 'feature')
+        run: |
+          python ${{ env.VERSION_UP }} ${{ env.NAME_VERSION_FILE }} ${{ env.MINOR }}
+
+      - name: Update version [patch] if hotfix branch
+        if: startsWith(steps.branch-names.outputs.current_branch, 'hotfix')
+        run: |
+          python ${{ env.VERSION_UP }} ${{ env.NAME_VERSION_FILE }} ${{ env.PATCH }}
+
+      - name: Get current time for changelog
+        uses: josStorer/get-current-time@v2
+        id: current-time
+        with:
+          format: YYYY.MM.DD
+          utcOffset: "+00:00"
+
+      - name: Update changelog.md and version
+        run: |
+          NEW_VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
+          TIMESTAMP="${{ steps.current-time.outputs.formattedTime }}"
+          if [ ! -f "${{ env.CHANGELOG_FILE }}" ]; then
+            echo "# Changelog" > ${{ env.CHANGELOG_FILE }}
+            echo "" >> ${{ env.CHANGELOG_FILE }}
+          fi
+          echo "---" >> ${{ env.CHANGELOG_FILE }}
+          echo "#### [${NEW_VERSION}] - $TIMESTAMP    ${{ github.ref_name }}" >> ${{ env.CHANGELOG_FILE }}
+          echo "" >> ${{ env.CHANGELOG_FILE }}
+
+      - name: Commit version and changelog to develop
+        run: |
+          NEW_VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add ${{ env.NAME_VERSION_FILE }} version/version_log ${{ env.CHANGELOG_FILE }}
+          git commit -m "[${NEW_VERSION}] Updated version and changelog [skip ci]" || echo "No changes to commit"
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:develop --force
+
+      - name: Add build version label
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
+            const version = "${{ steps.set-version.outputs.version }}".replace(/\./g, '-');
+            if (pullNumber && version) {
+              await github.rest.issues.addLabels({
+                issue_number: pullNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: [`build-v${version}`]
+              });
+            }
+
+      - name: Set version output
+        id: set-version
+        run: echo "version=$(cat ${{ env.NAME_VERSION_FILE }})" >> $GITHUB_OUTPUT
+
+  create-task-and-branch:
+    needs: [check-skip, versioning]
+    if: needs.check-skip.outputs.should_skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Create GitHub Issue
+        id: create-issue
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const response = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Task for version ${{ needs.versioning.outputs.version }}`,
+              body: `Automated task for branch ${{ github.ref_name }} and version ${{ needs.versioning.outputs.version }}`
+            });
+            return response.data.number;
+
+      - name: Create branch for task
+        run: |
+          ISSUE_NUMBER=${{ steps.create-issue.outputs.result }}
+          BRANCH_NAME="task-$ISSUE_NUMBER"
+          git checkout -b $BRANCH_NAME
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git $BRANCH_NAME
+
+  test-notify:
+    needs: [check-skip, create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis, versioning]
+    if: needs.check-skip.outputs.should_skip == 'false'
+    runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.determine-status.outputs.test_status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Determine test status
         id: determine-status
@@ -390,9 +420,8 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:new
+            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:${{ needs.versioning.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:latest
-            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:v${{ needs.versioning.outputs.version }}
           push: true
 
       - name: Build and push frontend
@@ -401,22 +430,9 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:new
+            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:${{ needs.versioning.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
-            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:v${{ needs.versioning.outputs.version }}
           push: true
-
-      - name: Send Telegram notification - Docker Push Completed
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          MESSAGE="Docker образы успешно загружены%0AВерсия: ${{ needs.versioning.outputs.version }}%0AПроект: ${{ github.repository }}"
-          curl -s -X POST \
-            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-            -d chat_id=${TELEGRAM_CHAT_ID} \
-            -d text="$MESSAGE" \
-            -d parse_mode="HTML"
 
       - name: Add label "dockerhub"
         if: success()
@@ -435,7 +451,7 @@ jobs:
             }
 
   auto-merge:
-    needs: [check-skip, create-pr, test-notify, sonar-analysis, docker-push, versioning]
+    needs: [check-skip, create-pr, test-notify, docker-push]
     if: always() && needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     permissions:
@@ -471,10 +487,7 @@ jobs:
           git push origin "$TAG"
 
       - name: Force Merge Feature Branch into Develop Locally
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
           git fetch origin
           git checkout ${{ github.ref_name }}
           git pull origin ${{ github.ref_name }} --ff-only
@@ -514,25 +527,25 @@ jobs:
                 pull_number: prNumber,
                 merge_method: 'merge',
                 commit_title: `Force merge PR #${prNumber} into develop`,
-                commit_message: 'Force merged by CI/CD pipeline, overwriting develop with feature branch changes'
+                commit_message: 'Force merged by CI/CD pipeline'
               });
-              console.log(`Pull Request #${prNumber} force merged successfully: ${response.data.sha}`);
+              console.log(`Pull Request #${prNumber} merged successfully: ${response.data.sha}`);
             } catch (error) {
-              console.error(`Failed to force merge PR #${prNumber}: ${error.message}`);
+              console.error(`Failed to merge PR #${prNumber}: ${error.message}`);
               console.log("Falling back to local force push result.");
             }
 
-      - name: Send Telegram notification - Merge Completed
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  deploy-dev:
+    needs: [check-skip, auto-merge, docker-push]
+    if: always() && needs.check-skip.outputs.should_skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Development Server
         run: |
-          MESSAGE="PR #${{ needs.create-pr.outputs.pr_number }} успешно смержен%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
-          curl -s -X POST \
-            https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-            -d chat_id=${TELEGRAM_CHAT_ID} \
-            -d text="$MESSAGE" \
-            -d parse_mode="HTML"
+          echo "Deploying to dev server..."
 
       - name: Add label "PROD"
         uses: actions/github-script@v6
@@ -548,17 +561,7 @@ jobs:
                 labels: ["PROD"]
               });
             }
-            
-  deploy-dev:
-    needs: [check-skip, auto-merge, docker-push]
-    if: always() && needs.check-skip.outputs.should_skip == 'false'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Deploy to Development Server
-        run: |
-          echo "Deploying to dev server..."
+
       - name: Deploy Kubernetes Pods
         run: |
           echo "Deploying pods in Kubernetes..."
@@ -570,15 +573,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-  
-      # Получение текущего времени для отчета
+
       - name: Get current time
         uses: josStorer/get-current-time@v2
         id: current-time
         with:
           format: YYYY.MM.DD HH:mm:ss
-          utcOffset: "+00:00" # Установите нужный часовой пояс
-  
+          utcOffset: "+00:00"
+
       - name: Send Final Telegram Report
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -598,12 +600,16 @@ jobs:
           %0A\
           <b>Информация о Docker-репозитории</b>%0A\
           <b>Владелец</b>: <a href='https://hub.docker.com/u/${{ secrets.DOCKER_HUB_USERNAME }}'>${{ secrets.DOCKER_HUB_USERNAME }}</a>%0A\
-          <b>Название</b>: <a href='https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME'>$REPO_NAME</a>%0A\
-          <b>Тег</b>: <a href='https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME/tags'>${{ needs.versioning.outputs.version }}</a>%0A\
-          <b>Полное имя</b>: <a href='https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME/tags'>${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME:${{ needs.versioning.outputs.version }}</a>%0A\
+          <b>Название (Frontend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend/general'>messenger-frontend</a>%0A\
+          <b>Тег (Frontend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend/general'>${{ needs.versioning.outputs.version }}</a>%0A\
+          <b>Полное имя (Frontend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend/general'>${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:${{ needs.versioning.outputs.version }}</a>%0A\
+          <b>Название (Backend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend/general'>messenger-backend</a>%0A\
+          <b>Тег (Backend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend/general'>${{ needs.versioning.outputs.version }}</a>%0A\
+          <b>Полное имя (Backend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend/general'>${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:${{ needs.versioning.outputs.version }}</a>%0A\
           %0A\
           <b>Ссылки</b>:%0A\
-          - <a href='https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME'>Docker Hub</a>%0A\
+          - <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend/general'>Docker Hub (Frontend)</a>%0A\
+          - <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend/general'>Docker Hub (Backend)</a>%0A\
           - <a href='http://ni-corp.tech/'>Стенд</a>"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
@@ -616,11 +622,11 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          if [ -f changelog.md ]; then
+          if [ -f ${{ env.CHANGELOG_FILE }} ]; then
             curl -s -X POST \
               https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument \
               -F chat_id=${TELEGRAM_CHAT_ID} \
-              -F document=@changelog.md \
+              -F document=@${{ env.CHANGELOG_FILE }} \
               -F caption="Changelog для версии ${{ needs.versioning.outputs.version }}" \
               -F parse_mode="HTML" || echo "Не удалось отправить файл changelog"
           else
