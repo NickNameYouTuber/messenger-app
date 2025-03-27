@@ -82,7 +82,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          MESSAGE="Создан новый PR #%{{ steps.create-pr.outputs.result }}%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
+          MESSAGE="Создан новый PR #${{ steps.create-pr.outputs.result }}%0AБранч: ${{ github.ref_name }}%0AПроект: ${{ github.repository }}"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
