@@ -21,7 +21,7 @@ jobs:
       should_skip: ${{ steps.check-commit.outputs.should_skip }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4  # Добавляем checkout репозитория
+        uses: actions/checkout@v4
 
       - name: Check commit message
         id: check-commit
@@ -33,7 +33,7 @@ jobs:
             echo "should_skip=false" >> $GITHUB_OUTPUT
           fi
         shell: bash
-        
+
   create-pr:
     needs: check-skip
     if: needs.check-skip.outputs.should_skip == 'false'
@@ -234,56 +234,32 @@ jobs:
         if: startsWith(steps.branch-names.outputs.current_branch, 'feature')
         run: |
           python ${{ env.VERSION_UP }} ${{ env.NAME_VERSION_FILE }} ${{ env.MINOR }}
-          VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
-          echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
-
       - name: Update version [patch]
         if: startsWith(steps.branch-names.outputs.current_branch, 'hotfix')
         run: |
           python ${{ env.VERSION_UP }} ${{ env.NAME_VERSION_FILE }} ${{ env.PATCH }}
-          VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
-          echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Get commit messages
-        id: commit
+      - name: Commit version and update changelog
         run: |
-          if [ -f .last_commit ]; then
-            PREV_COMMIT=$(cat .last_commit)
-          else
-            PREV_COMMIT=$(git rev-parse HEAD~1)
-          fi
-          COMMIT_MSG=$(git log ${PREV_COMMIT}..HEAD --pretty=format:"- %s")
-          echo "message<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          git rev-parse HEAD > .last_commit
-
-      - name: Update Changelog
-        if: env.NEW_VERSION != ''
-        run: |
+          NEW_VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
           TIMESTAMP=$(date '+%d.%m.%Y %H:%M:%S')
           CHANGELOG_FILE="changelog.md"
           if [ ! -f "$CHANGELOG_FILE" ]; then
             echo "# Changelog" > $CHANGELOG_FILE
             echo "" >> $CHANGELOG_FILE
           fi
-          echo "## [${{ env.NEW_VERSION }}] - $TIMESTAMP" >> $CHANGELOG_FILE
+          echo "## [${NEW_VERSION}] - $TIMESTAMP" >> $CHANGELOG_FILE
           echo "" >> $CHANGELOG_FILE
-          echo "${{ steps.commit.outputs.message }}" >> $CHANGELOG_FILE
-          echo "" >> $CHANGELOG_FILE
-
-      - name: Commit version and changelog
-        if: env.NEW_VERSION != ''
-        run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
-          git add ${{ env.NAME_VERSION_FILE }} version/version_log changelog.md .last_commit
-          git commit -m "Bump version to ${{ env.NEW_VERSION }} and update changelog [skip ci]" || echo "No changes to commit"
+          git add ${{ env.NAME_VERSION_FILE }} version/version_log changelog.md
+          git commit -m "Bump version to ${NEW_VERSION} and update changelog [skip ci]" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }} --force
+          echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Set version output
         id: set-version
-        run: echo "version=${{ env.NEW_VERSION }}" >> $GITHUB_OUTPUT
+        run: echo "version=$(cat ${{ env.NAME_VERSION_FILE }})" >> $GITHUB_OUTPUT
 
   test-notify:
     needs: [check-skip, create-pr, frontend-tests, backend-tests, antivirus-tests, sonar-analysis, versioning]
@@ -296,12 +272,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Get version
+      - name: Get version from versioning output
         id: get-version
         run: |
-          VERSION=$(cat version/version)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=${{ needs.versioning.outputs.version }}" >> $GITHUB_OUTPUT
 
       - name: Add build version label
         uses: actions/github-script@v6
@@ -309,7 +283,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
-            const version = "${{ env.VERSION }}".replace(/\./g, '-');
+            const version = "${{ needs.versioning.outputs.version }}".replace(/\./g, '-');
             if (pullNumber && version) {
               await github.rest.issues.addLabels({
                 issue_number: pullNumber,
@@ -357,10 +331,10 @@ jobs:
           FRONTEND_STATUS="${{ needs.frontend-tests.outputs.test_status }}"
           BACKEND_STATUS="${{ needs.backend-tests.outputs.test_status }}"
           if [[ "$FRONTEND_STATUS" == "success" && "$BACKEND_STATUS" == "success" ]]; then
-            echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}" >> $GITHUB_ENV
+            echo "MESSAGE=✅ All tests passed successfully!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ needs.versioning.outputs.version }}" >> $GITHUB_ENV
             echo "test_status=success" >> $GITHUB_OUTPUT
           else
-            echo "MESSAGE=❌ Some tests failed!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ env.VERSION }}%0AFrontend: $FRONTEND_STATUS%0ABackend: $BACKEND_STATUS" >> $GITHUB_ENV
+            echo "MESSAGE=❌ Some tests failed!%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0AVersion: ${{ needs.versioning.outputs.version }}%0AFrontend: $FRONTEND_STATUS%0ABackend: $BACKEND_STATUS" >> $GITHUB_ENV
             echo "test_status=failure" >> $GITHUB_OUTPUT
           fi
         shell: bash
@@ -386,7 +360,7 @@ jobs:
           password: ${{ secrets.SMTP_PASSWORD }}
           from: ${{ secrets.SMTP_USER }}
           to: ${{ secrets.EMAIL_RECIPIENT }}
-          subject: Test Results - ${{ github.ref_name }} (v${{ env.VERSION }})
+          subject: Test Results - ${{ github.ref_name }} (v${{ needs.versioning.outputs.version }})
           body: |
             The test results are as follows:
             ${{ env.MESSAGE }}
@@ -533,7 +507,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          MESSAGE="Docker образы успешно загружены%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AПроект: ${{ github.repository }}"
+          MESSAGE="Docker образы успешно загружены%0AВерсия: ${{ needs.versioning.outputs.version }}%0AПроект: ${{ github.repository }}"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -585,7 +559,7 @@ jobs:
         run: |
           REPO_OWNER=$(echo "${{ github.repository }}" | cut -d '/' -f 1)
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d '/' -f 2)
-          REPORT="Новый выпуск изменений%0AПроект: ${{ github.repository }}%0AВерсия: ${{ needs.test-notify.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.test-notify.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: ${{ secrets.DOCKER_HUB_USERNAME }}%0AНазвание: $REPO_NAME%0AТег: ${{ needs.test-notify.outputs.version }}%0AПолное имя: ${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME:v${{ needs.test-notify.outputs.version }}%0AСсылки:%0A- Docker Hub: https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME%0A- Стенд: http://ni-corp.tech/"
+          REPORT="Новый выпуск изменений%0AПроект: ${{ github.repository }}%0AВерсия: ${{ needs.versioning.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.versioning.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: ${{ secrets.DOCKER_HUB_USERNAME }}%0AНазвание: $REPO_NAME%0AТег: ${{ needs.versioning.outputs.version }}%0AПолное имя: ${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME:v${{ needs.versioning.outputs.version }}%0AСсылки:%0A- Docker Hub: https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME%0A- Стенд: http://ni-corp.tech/"
           echo "$REPORT"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
@@ -603,7 +577,7 @@ jobs:
               https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument \
               -F chat_id=${TELEGRAM_CHAT_ID} \
               -F document=@changelog.md \
-              -F caption="Changelog для версии ${{ needs.test-notify.outputs.version }}" \
+              -F caption="Changelog для версии ${{ needs.versioning.outputs.version }}" \
               -F parse_mode="HTML" || echo "Не удалось отправить файл changelog"
           else
             curl -s -X POST \
