@@ -435,7 +435,7 @@ jobs:
             }
 
   auto-merge:
-    needs: [check-skip, create-pr, test-notify, sonar-analysis, docker-push]
+    needs: [check-skip, create-pr, test-notify, sonar-analysis, docker-push, versioning]
     if: always() && needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     permissions:
