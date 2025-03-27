@@ -465,7 +465,7 @@ jobs:
             }
 
   docker-push:
-    needs: [check-skip, test-notify]
+    needs: [check-skip, test-notify, versioning]
     if: needs.check-skip.outputs.should_skip == 'false'
     permissions:
       contents: read
@@ -545,7 +545,7 @@ jobs:
           echo "Deploying pods in Kubernetes..."
 
   final-report:
-    needs: [check-skip, create-pr, frontend-tests, backend-tests, test-notify, auto-merge, sonar-analysis, docker-push]
+    needs: [check-skip, create-pr, frontend-tests, backend-tests, test-notify, auto-merge, sonar-analysis, docker-push, versioning]
     if: always() && needs.check-skip.outputs.should_skip == 'false'
     runs-on: ubuntu-latest
     steps:
