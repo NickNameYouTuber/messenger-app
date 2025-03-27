@@ -455,8 +455,9 @@ jobs:
 
       - name: Create Git Tag
         run: |
-          git tag v${{ needs.versioning.outputs.version }}
-          git push origin v${{ needs.versioning.outputs.version }}
+          VERSION=${{ needs.versioning.outputs.version }}
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
 
       - name: Force Merge Feature Branch into Develop Locally
         env:
@@ -536,7 +537,7 @@ jobs:
                 labels: ["PROD"]
               });
             }
-
+            
   deploy-dev:
     needs: [check-skip, auto-merge, docker-push]
     if: always() && needs.check-skip.outputs.should_skip == 'false'
