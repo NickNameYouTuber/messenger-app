@@ -570,7 +570,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+  
+      # Получение текущего времени для отчета
+      - name: Get current time
+        uses: josStorer/get-current-time@v2
+        id: current-time
+        with:
+          format: YYYY.MM.DD HH:mm:ss
+          utcOffset: "+00:00" # Установите нужный часовой пояс
+  
       - name: Send Final Telegram Report
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -578,14 +586,31 @@ jobs:
         run: |
           REPO_OWNER=$(echo "${{ github.repository }}" | cut -d '/' -f 1)
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d '/' -f 2)
-          REPORT="Новый выпуск изменений%0AПроект: ${{ github.repository }}%0AВерсия: ${{ needs.versioning.outputs.version }}%0AДата: $(date '+%Y.%m.%d %H:%M:%S')%0AАвтор: ${{ github.actor }}%0AИнформация о Git-репозитории%0AGIT MR: ${{ needs.create-pr.outputs.pr_number }}%0AGIT TAG: ${{ needs.versioning.outputs.version }}%0AИнформация о Docker-репозитории%0AВладелец: ${{ secrets.DOCKER_HUB_USERNAME }}%0AНазвание: $REPO_NAME%0AТег: ${{ needs.versioning.outputs.version }}%0AПолное имя: ${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME:v${{ needs.versioning.outputs.version }}%0AСсылки:%0A- Docker Hub: https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME%0A- Стенд: http://ni-corp.tech/"
-          echo "$REPORT"
+          REPORT="Новый выпуск изменений%0A\
+          <b>Проект</b>: <code>${{ github.repository }}</code>%0A\
+          <b>Версия</b>: <code>${{ needs.versioning.outputs.version }}</code>%0A\
+          <b>Дата</b>: <code>${{ steps.current-time.outputs.formattedTime }}</code>%0A\
+          <b>Автор</b>: <a href='https://github.com/${{ github.actor }}'>${{ github.actor }}</a>%0A\
+          %0A\
+          <b>Информация о Git-репозитории</b>%0A\
+          <b>GIT MR</b>: <a href='${{ github.server_url }}/${{ github.repository }}/pull/${{ needs.create-pr.outputs.pr_number }}'>${{ needs.create-pr.outputs.pr_number }}</a>%0A\
+          <b>GIT TAG</b>: <a href='${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.versioning.outputs.version }}'>v${{ needs.versioning.outputs.version }}</a>%0A\
+          %0A\
+          <b>Информация о Docker-репозитории</b>%0A\
+          <b>Владелец</b>: <a href='https://hub.docker.com/u/${{ secrets.DOCKER_HUB_USERNAME }}'>${{ secrets.DOCKER_HUB_USERNAME }}</a>%0A\
+          <b>Название</b>: <a href='https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME'>$REPO_NAME</a>%0A\
+          <b>Тег</b>: <a href='https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME/tags'>${{ needs.versioning.outputs.version }}</a>%0A\
+          <b>Полное имя</b>: <a href='https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME/tags'>${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME:${{ needs.versioning.outputs.version }}</a>%0A\
+          %0A\
+          <b>Ссылки</b>:%0A\
+          - <a href='https://hub.docker.com/r/${{ secrets.DOCKER_HUB_USERNAME }}/$REPO_NAME'>Docker Hub</a>%0A\
+          - <a href='http://ni-corp.tech/'>Стенд</a>"
           curl -s -X POST \
             https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
             -d text="$REPORT" \
             -d parse_mode="HTML" || echo "Не удалось отправить основной отчёт"
-
+  
       - name: Send Changelog File (if exists)
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
