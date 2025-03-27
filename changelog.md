@@ -400,3 +400,53 @@
 
 - Bump version to 0.50.0 and update changelog
 
+## [0.52.0] - 26.03.2025 16:01:31
+
+- Bump version to 0.51.0 and update changelog
+
+## [0.53.0] - 26.03.2025 16:01:43
+
+- Bump version to 0.52.0 and update changelog
+
+## [0.54.0] - 26.03.2025 16:20:45
+
+- Update ci_cd.yml
+- Bump version to 0.53.0 and update changelog
+
+## [0.55.0] - 26.03.2025 16:21:55
+
+- Update ci_cd.yml
+- Bump version to 0.54.0 and update changelog
+
+## [0.56.0] - 26.03.2025 16:28:09
+
+- Delete version.yml
+- Bump version to 0.55.0 and update changelog [skip ci]
+
+## [0.57.0] - 26.03.2025 23:55:22
+
+- Update ci_cd.yml_old_code
+- Update ci_cd.yml_skip_2_jobs
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Update ci_cd.yml
+- Bump version to 0.56.0 and update changelog [skip ci]
+
+## [0.58.0] - 27.03.2025 00:21:05
+
+- Update ci_cd.yml_update -X
+- Bump version to 0.57.0 and update changelog [skip ci]
+

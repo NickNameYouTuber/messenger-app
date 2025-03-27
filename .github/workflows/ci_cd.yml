@@ -421,7 +421,7 @@ jobs:
           git pull origin ${{ github.ref_name }} --ff-only
           git checkout develop
           git pull origin develop --ff-only
-          git merge ${{ github.ref_name }} -X ours --allow-unrelated-histories -m "Force merge ${{ github.ref_name }} into develop" || {
+          git merge ${{ github.ref_name }} -X theirs --allow-unrelated-histories -m "Force merge ${{ github.ref_name }} into develop" || {
             echo "Conflicts detected, forcing feature branch changes over develop"
             git checkout --ours .
             git add .
