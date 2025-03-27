@@ -184,6 +184,8 @@ jobs:
           script: |
             const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
             if (pullNumber) {
+              await githubម
+
               await github.rest.issues.addLabels({
                 issue_number: pullNumber,
                 owner: context.repo.owner,
@@ -285,14 +287,15 @@ jobs:
           echo "#### [${NEW_VERSION}] - $TIMESTAMP    ${{ github.ref_name }}" >> ${{ env.CHANGELOG_FILE }}
           echo "" >> ${{ env.CHANGELOG_FILE }}
 
-      - name: Commit version and changelog to develop
+      - name: Commit version, changelog, and create tag
         run: |
           NEW_VERSION=$(cat ${{ env.NAME_VERSION_FILE }})
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git add ${{ env.NAME_VERSION_FILE }} version/version_log ${{ env.CHANGELOG_FILE }}
           git commit -m "[${NEW_VERSION}] Updated version and changelog [skip ci]" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:develop --force
+          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git HEAD:develop --tags --force
 
       - name: Add build version label
         uses: actions/github-script@v6
@@ -420,7 +423,7 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:${{ needs.versioning.outputs.version }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:v${{ needs.versioning.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:latest
           push: true
 
@@ -430,7 +433,7 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:${{ needs.versioning.outputs.version }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:v${{ needs.versioning.outputs.version }}
             ${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:latest
           push: true
 
@@ -585,10 +588,10 @@ jobs:
           <b>Владелец</b>: <a href='https://hub.docker.com/u/${{ secrets.DOCKER_HUB_USERNAME }}'>${{ secrets.DOCKER_HUB_USERNAME }}</a>%0A\
           <b>Название (Frontend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend/general'>messenger-frontend</a>%0A\
           <b>Тег (Frontend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend/general'>${{ needs.versioning.outputs.version }}</a>%0A\
-          <b>Полное имя (Frontend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend/general'>${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:${{ needs.versioning.outputs.version }}</a>%0A\
+          <b>Полное имя (Frontend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend/general'>${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend:v${{ needs.versioning.outputs.version }}</a>%0A\
           <b>Название (Backend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend/general'>messenger-backend</a>%0A\
           <b>Тег (Backend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend/general'>${{ needs.versioning.outputs.version }}</a>%0A\
-          <b>Полное имя (Backend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend/general'>${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:${{ needs.versioning.outputs.version }}</a>%0A\
+          <b>Полное имя (Backend)</b>: <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend/general'>${{ secrets.DOCKER_HUB_USERNAME }}/messenger-backend:v${{ needs.versioning.outputs.version }}</a>%0A\
           %0A\
           <b>Ссылки</b>:%0A\
           - <a href='https://hub.docker.com/repository/docker/${{ secrets.DOCKER_HUB_USERNAME }}/messenger-frontend/general'>Docker Hub (Frontend)</a>%0A\
