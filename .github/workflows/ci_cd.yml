@@ -455,9 +455,8 @@ jobs:
 
       - name: Create Git Tag
         run: |
-          VERSION=${{ needs.versioning.outputs.version }}
-          git tag "v${VERSION}"
-          git push origin "v${VERSION}"
+          git tag "v${{ needs.versioning.outputs.version }}"
+          git push origin "v${{ needs.versioning.outputs.version }}"
 
       - name: Force Merge Feature Branch into Develop Locally
         env:
