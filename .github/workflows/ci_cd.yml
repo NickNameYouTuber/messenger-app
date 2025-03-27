@@ -184,7 +184,7 @@ jobs:
           script: |
             const pullNumber = "${{ needs.create-pr.outputs.pr_number }}";
             if (pullNumber) {
-              await githubម
+              await github
 
               await github.rest.issues.addLabels({
                 issue_number: pullNumber,
