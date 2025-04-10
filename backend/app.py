@@ -1,8 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-app = FastAPI(openapi_prefix="/api/v1")
+from backend.api import api_router
 
+app = FastAPI()
+
+app.include_router(api_router, prefix="/api/v1")
 
 
 cities_data = {
