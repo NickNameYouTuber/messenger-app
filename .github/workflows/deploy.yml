@@ -18,17 +18,17 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p 2222 37.252.17.138 >> ~/.ssh/known_hosts
+          ssh-keyscan -p 2222 195.58.34.98 >> ~/.ssh/known_hosts
 
       - name: Sync project files
         run: |
           rsync -avz -e "ssh -p 2222 -i ~/.ssh/deploy_key" \
             --exclude='.git' --exclude='.github' --exclude='node_modules' \
-            ./ nick@37.252.17.138:/home/nick/project/
+            ./ nick@195.58.34.98:/home/nick/project/
 
       - name: Build and deploy on remote
         run: |
-          ssh -p 2222 -i ~/.ssh/deploy_key nick@37.252.17.138 << 'EOF'
+          ssh -p 2222 -i ~/.ssh/deploy_key nick@195.58.34.98 << 'EOF'
             set -ex
             cd /home/nick/project
             
